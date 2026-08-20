@@ -55,6 +55,12 @@ OUTPUT_DIR = r"C:\Users\ed249\Downloads\xianggate-site"
 # 用 `python xianggate_weekly.py --diag` 看兩個日期實際差多少再決定。
 DATE_BASIS = "modified"
 
+# ── 公開安全模式（坍縮權：Edward）──────────────────────────
+# True  ＝ 發佈版隱藏逐檔明細（檔名/首句預覽/路徑），只留聚合圖表(計數/環次/分佈/熱區)。
+#         GitHub Pages 站台一律公開(即使 repo 私有)，逐字稿檔名與內容首句會被全網索引。
+# False ＝ 顯示完整逐檔表(僅在你確認素材皆非敏感、或只在本機開時使用)。
+PUBLIC_SAFE = True
+
 # 讀檔嘗試編碼順序（台灣 Windows：utf-8 / cp950(Big5) 混用是常態）
 ENCODINGS = ["utf-8-sig", "utf-8", "cp950", "big5", "gb18030", "latin-1"]
 
@@ -382,6 +388,62 @@ def _histogram_svg(dist, key, color, height=200):
            f'role="img">{"".join(parts)}</svg>')
     return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
 
+def _hist_cumline_svg(dist, key, bar_color, line_color, height=232):
+    """柱(每週) + 累加折線(running total，沿線標數值)。末點＝全庫總量。"""
+    if not dist:
+        return '<div class="empty">無資料</div>'
+    n = len(dist)
+    bar_w = max(9, min(30, int(760 / n)))
+    gap = max(2, bar_w // 3)
+    width = n * (bar_w + gap) + gap + 8
+    weekly_max = max((d[key] for d in dist), default=1) or 1
+    cum, run = [], 0
+    for d in dist:
+        run += d[key]
+        cum.append(run)
+    cum_max = cum[-1] or 1
+    top_pad = 18
+    base = height - 26          # 柱狀基線
+    plot_h = base - top_pad
+    label_every = max(1, n // 12)
+    parts = [f'<text x="{gap}" y="12" font-size="10" fill="{PALETTE["mute"]}">'
+             f'柱＝每週　折線＝累加（末點 {cum[-1]:,}）</text>']
+    # 每週柱
+    for i, d in enumerate(dist):
+        x = gap + i * (bar_w + gap)
+        h = (d[key] / weekly_max) * plot_h
+        y = base - h
+        parts.append(
+            f'<rect x="{x}" y="{y:.1f}" width="{bar_w}" height="{h:.1f}" rx="2" fill="{bar_color}">'
+            f'<title>{html.escape(d["week"])}：本週 {d[key]:,} ｜ 累加 {cum[i]:,}</title></rect>'
+        )
+        if i % label_every == 0 or i == n - 1:
+            parts.append(
+                f'<text x="{x + bar_w/2:.1f}" y="{height - 8}" text-anchor="middle" '
+                f'font-size="9" fill="{PALETTE["mute"]}">{html.escape(d["week"].split("-")[-1])}</text>'
+            )
+    # 累加折線
+    pts = []
+    for i, c in enumerate(cum):
+        x = gap + i * (bar_w + gap) + bar_w / 2
+        y = base - (c / cum_max) * plot_h
+        pts.append((x, y))
+    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    parts.append(f'<polyline points="{poly}" fill="none" stroke="{line_color}" stroke-width="2"/>')
+    for i, (x, y) in enumerate(pts):
+        parts.append(
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.6" fill="{line_color}">'
+            f'<title>{html.escape(dist[i]["week"])} 累加 {cum[i]:,}</title></circle>'
+        )
+        if i % label_every == 0 or i == n - 1:
+            parts.append(
+                f'<text x="{x:.1f}" y="{y - 6:.1f}" text-anchor="middle" font-size="9" '
+                f'fill="{line_color}" font-weight="600">{cum[i]:,}</text>'
+            )
+    svg = (f'<svg viewBox="0 0 {width} {height}" width="{max(width, 320)}" height="{height}" '
+           f'role="img">{"".join(parts)}</svg>')
+    return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
+
 def _ring_heatmap_svg(dist, rings_6, rings_5):
     """環次命中時間熱區圖：環當列、週當欄、色深＝該週該環累計強度。
     六環用 teal(gold)、五環用 jade，以色相區分兩組截面。"""
@@ -461,25 +523,42 @@ def render_html(files, summary, history):
     six_total_pairs = [(r.replace("總綱環", ""), summary["ring_total"][r]) for r in RING_ORDER_6]
     five_total_pairs = [(r.replace("總經環", ""), summary["ring_total"][r]) for r in RING_ORDER_5]
 
-    # 缺目錄警示
+    # 缺目錄警示（公開模式只顯示資料夾名，不洩完整路徑）
     missing_html = ""
     if summary["missing_dirs"]:
-        items = "".join(f"<li>{html.escape(d)}</li>" for d in summary["missing_dirs"])
+        def _dshow(d):
+            return os.path.basename(d.rstrip("\\/")) if PUBLIC_SAFE else d
+        items = "".join(f"<li>{html.escape(_dshow(d))}</li>" for d in summary["missing_dirs"])
         missing_html = (f'<div class="warn"><b>掃描目錄缺失</b>（未計入）：<ul>{items}</ul></div>')
 
     # 本週新增檔清單
     basis = summary.get("date_basis", "modified")
     b_created = " (基準)" if basis == "created" else ""
     b_modified = " (基準)" if basis == "modified" else ""
-    if week_files:
+    if PUBLIC_SAFE:
+        # 公開安全模式：隱藏逐檔明細（檔名/首句/路徑），只留本週聚合命中
+        wk_ring = {r: 0.0 for r in RING_ORDER_6 + RING_ORDER_5}
+        for f in week_files:
+            for r, (_c, s) in f["rings"].items():
+                wk_ring[r] += s
+        top_rings = sorted(((r, v) for r, v in wk_ring.items() if v > 0),
+                           key=lambda kv: -kv[1])
+        tags = "".join(
+            f'<span class="ring-tag">{html.escape(r.replace("總綱","綱").replace("總經","經"))}·{v:g}</span>'
+            for r, v in top_rings
+        ) or '<span class="ring-none">本週無環次命中</span>'
+        week_table = (
+            '<div class="note">公開安全模式：逐檔明細（檔名／首句／路徑）已隱藏，'
+            '僅本機完整版顯示。以下為本週環次命中聚合：</div>'
+            f'<div class="rings" style="margin-top:8px">{tags}</div>'
+        )
+    elif week_files:
         rows = []
         for f in week_files[:200]:
             ring_tags = "".join(
                 f'<span class="ring-tag">{html.escape(r.replace("總綱","綱").replace("總經","經"))}·{s:g}</span>'
                 for r, (_c, s) in sorted(f["rings"].items(), key=lambda kv: -kv[1][1])
             ) or '<span class="ring-none">—</span>'
-            # 建立==修改 標一致；不同則標出（複製污染的線索）
-            same = f["created"][:16] == f["modified"][:16]
             cre_cls = "" if basis != "created" else ' style="font-weight:600"'
             mod_cls = "" if basis != "modified" else ' style="font-weight:600"'
             rows.append(
@@ -562,7 +641,7 @@ def render_html(files, summary, history):
 <body>
 <div class="wrap">
   <h1>相閘 XiangGate · 素材週報</h1>
-  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)} ｜ 匯入日期基準：<b>{'建立日期' if summary.get('date_basis')=='created' else '修改日期'}</b></div>
+  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)} ｜ 匯入日期基準：<b>{'建立日期' if summary.get('date_basis')=='created' else '修改日期'}</b>{' ｜ <b>公開安全模式</b>' if PUBLIC_SAFE else ''}</div>
   <div class="motto">相入 · 閘決 · Edward 坍縮 · 軸不動，θ 趨近。</div>
 
   {missing_html}
@@ -609,10 +688,10 @@ def render_html(files, summary, history):
 
   <section>
     <h2>素材時間分佈 · 全庫（依{'建立' if summary.get('date_basis')=='created' else '修改'}週）</h2>
-    <div class="chart-title">每週素材數（共 {len(summary['week_distribution'])} 週 · {summary['total_files']:,} 檔）</div>
-    {_histogram_svg(summary['week_distribution'], 'files', P['gold'])}
-    <div class="chart-title" style="margin-top:14px">每週字元量</div>
-    {_histogram_svg(summary['week_distribution'], 'chars', P['jade'])}
+    <div class="chart-title">每週素材數 + 累加（共 {len(summary['week_distribution'])} 週 · {summary['total_files']:,} 檔）</div>
+    {_hist_cumline_svg(summary['week_distribution'], 'files', P['gold'], P['red'])}
+    <div class="chart-title" style="margin-top:14px">每週字元量 + 累加（末點 {summary['total_chars']:,}）</div>
+    {_hist_cumline_svg(summary['week_distribution'], 'chars', P['jade'], P['red'])}
     <div class="note">全庫回溯：每檔依其{'建立' if summary.get('date_basis')=='created' else '修改'}日期歸入 ISO 週，
       即時計算（規格 §5），非腳本執行紀錄。滑鼠移到長條看該週檔數／字元。
       history.json 仍每週追加做不遺忘稽核。</div>
@@ -689,6 +768,7 @@ def main():
 
     print(f"[相閘週報] {summary['week_key']}  as-of {summary['asof']}")
     print(f"  匯入日期基準: {summary['date_basis']}（{'建立日期' if summary['date_basis']=='created' else '修改日期'}）")
+    print(f"  公開安全模式: {'ON(逐檔明細隱藏)' if PUBLIC_SAFE else 'OFF(顯示完整逐檔表)'}")
     print(f"  掃描目錄  : {scan_dirs}")
     if summary["missing_dirs"]:
         print(f"  ⚠ 缺目錄  : {summary['missing_dirs']}")
