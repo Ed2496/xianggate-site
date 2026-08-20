@@ -690,8 +690,8 @@ def render_html(files, summary, history):
     <h2>素材時間分佈 · 全庫（依{'建立' if summary.get('date_basis')=='created' else '修改'}週）</h2>
     <div class="chart-title">每週素材數 + 累加（共 {len(summary['week_distribution'])} 週 · {summary['total_files']:,} 檔）</div>
     {_hist_cumline_svg(summary['week_distribution'], 'files', P['gold'], P['red'])}
-    <div class="chart-title" style="margin-top:14px">每週字元量</div>
-    {_histogram_svg(summary['week_distribution'], 'chars', P['jade'])}
+    <div class="chart-title" style="margin-top:14px">每週字元量 + 累加（末點 {summary['total_chars']:,}）</div>
+    {_hist_cumline_svg(summary['week_distribution'], 'chars', P['jade'], P['red'])}
     <div class="note">全庫回溯：每檔依其{'建立' if summary.get('date_basis')=='created' else '修改'}日期歸入 ISO 週，
       即時計算（規格 §5），非腳本執行紀錄。滑鼠移到長條看該週檔數／字元。
       history.json 仍每週追加做不遺忘稽核。</div>
