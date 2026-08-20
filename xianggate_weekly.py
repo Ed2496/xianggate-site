@@ -47,6 +47,14 @@ EXTENSIONS = [".txt", ".md"]
 # index.html 覆寫成最新一週；reports/YYYY-Www.html 存每週封存；history.json 存趨勢
 OUTPUT_DIR = r"C:\Users\ed249\Downloads\xianggate-site"
 
+# ── 匯入日期基準（坍縮權：Edward）──────────────────────────
+# 'created'  ＝ 檔案建立日期（原地生成的檔用這個才對）
+# 'modified' ＝ 檔案修改日期（批次複製/移動進來的檔用這個才對）
+# ⚠ Windows 陷阱：複製/移動檔案會把「建立日期」重設成複製當下(可能全變今天)，
+#   而「修改日期」常保留原始內容變更時間。若建立日期全擠成今天 → 改用 'modified'。
+# 用 `python xianggate_weekly.py --diag` 看兩個日期實際差多少再決定。
+DATE_BASIS = "modified"
+
 # 讀檔嘗試編碼順序（台灣 Windows：utf-8 / cp950(Big5) 混用是常態）
 ENCODINGS = ["utf-8-sig", "utf-8", "cp950", "big5", "gb18030", "latin-1"]
 
@@ -170,16 +178,27 @@ def gather(scan_dirs, extensions, asof_dt):
                     continue
                 text, enc = read_text_robust(fpath)
                 lines, non_ws, cjk, words = count_units(text)
-                mtime = datetime.fromtimestamp(st.st_mtime)
+                # 同時記錄建立日期與修改日期，依 DATE_BASIS 決定週窗判準（坍縮權：Edward）
+                # Windows: st_birthtime(3.12+) 優先，退回 st_ctime(Windows 上＝建立時間)
+                created_ts = getattr(st, "st_birthtime", None)
+                if created_ts is None:
+                    created_ts = st.st_ctime
+                mtime_ts = st.st_mtime
+                basis_ts = created_ts if DATE_BASIS == "created" else mtime_ts
+                created = datetime.fromtimestamp(created_ts)
+                modified = datetime.fromtimestamp(mtime_ts)
                 rings = scan_rings(text)
                 files.append({
                     "path": fpath,
                     "name": fn,
                     "src_dir": d,
                     "size": st.st_size,
-                    "mtime": mtime.isoformat(timespec="seconds"),
-                    "mtime_ts": st.st_mtime,
-                    "is_new": st.st_mtime >= wk_start_ts,
+                    "created": created.isoformat(timespec="seconds"),
+                    "created_ts": created_ts,
+                    "modified": modified.isoformat(timespec="seconds"),
+                    "modified_ts": mtime_ts,
+                    "basis_ts": basis_ts,
+                    "is_new": basis_ts >= wk_start_ts,
                     "encoding": enc,
                     "lines": lines,
                     "chars": non_ws,
@@ -190,7 +209,7 @@ def gather(scan_dirs, extensions, asof_dt):
                     "sha256": sha256_text(text)[:16],
                 })
 
-    files.sort(key=lambda x: x["mtime_ts"], reverse=True)
+    files.sort(key=lambda x: x["basis_ts"], reverse=True)
 
     # 環次命中彙總(全庫 + 本週)
     ring_total = {r: 0.0 for r in RING_ORDER_6 + RING_ORDER_5}
@@ -204,10 +223,28 @@ def gather(scan_dirs, extensions, asof_dt):
                 ring_week[r] += strength
 
     week_files = [f for f in files if f["is_new"]]
+
+    # 全庫回溯分佈：每檔依 basis 日期(修改/建立)歸入 ISO 週(規格 §5「本機即時計算」)
+    # 同時累計每環強度 → 環次命中時間趨勢(規格 §5「環次每週11線趨勢」熱區版)
+    all_rings = RING_ORDER_6 + RING_ORDER_5
+    dist = {}
+    for f in files:
+        wk = iso_week_key(datetime.fromtimestamp(f["basis_ts"]).date())
+        b = dist.setdefault(wk, {"week": wk, "files": 0, "chars": 0,
+                                 "rings": {r: 0.0 for r in all_rings}})
+        b["files"] += 1
+        b["chars"] += f["chars"]
+        for r, (_cnt, strength) in f["rings"].items():
+            b["rings"][r] += strength
+    for b in dist.values():
+        b["rings"] = {r: round(v, 3) for r, v in b["rings"].items()}
+    week_distribution = sorted(dist.values(), key=lambda d: d["week"])
+
     summary = {
         "asof": asof_dt.isoformat(timespec="seconds"),
         "week_key": iso_week_key(asof_date),
         "week_start": wk_start.isoformat(),
+        "date_basis": DATE_BASIS,
         "scan_dirs": scan_dirs,
         "missing_dirs": missing_dirs,
         "total_files": len(files),
@@ -215,6 +252,7 @@ def gather(scan_dirs, extensions, asof_dt):
         "total_chars": sum(f["chars"] for f in files),
         "week_chars": sum(f["chars"] for f in week_files),
         "total_words": sum(f["words"] for f in files),
+        "week_distribution": week_distribution,
         "ring_total": {r: round(v, 3) for r, v in ring_total.items()},
         "ring_week": {r: round(v, 3) for r, v in ring_week.items()},
         "ring_files": ring_files,
@@ -297,7 +335,7 @@ def _trend_svg(history, key="week_chars", height=160, pad=34):
     dots = "".join(
         f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{PALETTE["gold"]}"/>'
         f'<text x="{x:.1f}" y="{y - 8:.1f}" text-anchor="middle" font-size="10" '
-        f'fill="{PALETTE["paper"]}">{pts[i][1]:g}</text>'
+        f'fill="{PALETTE["paper"]}">{pts[i][1]:,.0f}</text>'
         for i, (x, y) in enumerate(coords)
     )
     labels = "".join(
@@ -309,6 +347,95 @@ def _trend_svg(history, key="week_chars", height=160, pad=34):
             f'stroke-width="2"/>') if n > 1 else ""
     return (f'<svg viewBox="0 0 {width} {height}" width="100%" '
             f'preserveAspectRatio="xMidYMid meet" role="img">{line}{dots}{labels}</svg>')
+
+def _histogram_svg(dist, key, color, height=200):
+    """全庫回溯直方圖：dist=[{week,files,chars}...]，依週橫排，橫向可捲。"""
+    if not dist:
+        return '<div class="empty">無資料</div>'
+    n = len(dist)
+    bar_w = max(6, min(30, int(760 / n)))
+    gap = max(2, bar_w // 3)
+    width = n * (bar_w + gap) + gap
+    max_val = max((d[key] for d in dist), default=1) or 1
+    label_every = max(1, n // 14)  # 週數多時稀疏標籤，避免擠成一團
+    parts = []
+    for i, d in enumerate(dist):
+        x = gap + i * (bar_w + gap)
+        h = (d[key] / max_val) * (height - 44)
+        y = height - 26 - h
+        parts.append(
+            f'<rect x="{x}" y="{y:.1f}" width="{bar_w}" height="{h:.1f}" rx="2" fill="{color}">'
+            f'<title>{html.escape(d["week"])} ｜ {d["files"]:,} 檔 ｜ {d["chars"]:,} 字元</title></rect>'
+        )
+        if i % label_every == 0 or i == n - 1:
+            wk_short = d["week"].split("-")[-1]  # e.g. W34
+            parts.append(
+                f'<text x="{x + bar_w/2:.1f}" y="{height - 8}" text-anchor="middle" '
+                f'font-size="9" fill="{PALETTE["mute"]}">{html.escape(wk_short)}</text>'
+            )
+    peak = max(dist, key=lambda d: d[key])
+    parts.append(
+        f'<text x="{gap}" y="14" font-size="11" fill="{PALETTE["mute"]}">'
+        f'峰值 {html.escape(peak["week"])}：{peak[key]:,}</text>'
+    )
+    svg = (f'<svg viewBox="0 0 {width} {height}" width="{max(width, 320)}" height="{height}" '
+           f'role="img">{"".join(parts)}</svg>')
+    return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
+
+def _ring_heatmap_svg(dist, rings_6, rings_5):
+    """環次命中時間熱區圖：環當列、週當欄、色深＝該週該環累計強度。
+    六環用 teal(gold)、五環用 jade，以色相區分兩組截面。"""
+    if not dist:
+        return '<div class="empty">無資料</div>'
+    rings = rings_6 + rings_5
+    n = len(dist)
+    cell_w = max(9, min(26, int(760 / n)))
+    cell_h = 17
+    left = 46            # 左側環標籤欄寬
+    top = 6
+    gap_group = 6        # 六環/五環之間留白
+    rows = len(rings)
+    height = top + rows * cell_h + gap_group + 22
+    width = left + n * cell_w + 6
+    # 全域最大強度(排除 0)供正規化
+    gmax = max((b["rings"][r] for b in dist for r in rings), default=1) or 1
+    label_every = max(1, n // 14)
+
+    def short(r):
+        return r.replace("總綱環", "綱").replace("總經環", "經")
+
+    parts = []
+    for ri, r in enumerate(rings):
+        grp_color = PALETTE["gold"] if r in rings_6 else PALETTE["jade"]
+        extra = gap_group if r in rings_5 else 0   # 五環起始下推留白
+        ry = top + ri * cell_h + extra
+        # 左側環標籤
+        parts.append(
+            f'<text x="{left - 6}" y="{ry + cell_h*0.7:.1f}" text-anchor="end" '
+            f'font-size="10" fill="{PALETTE["paper"]}">{html.escape(short(r))}</text>'
+        )
+        for wi, b in enumerate(dist):
+            v = b["rings"][r]
+            x = left + wi * cell_w
+            op = 0.0 if v == 0 else round(0.12 + 0.88 * (v / gmax), 3)
+            fill = "#F2F7F5" if v == 0 else grp_color
+            parts.append(
+                f'<rect x="{x}" y="{ry:.1f}" width="{cell_w-1}" height="{cell_h-1}" '
+                f'rx="1.5" fill="{fill}" fill-opacity="{op}">'
+                f'<title>{html.escape(b["week"])} ｜ {html.escape(short(r))} ｜ 強度 {v:g}</title></rect>'
+            )
+    # 底部週標籤(稀疏)
+    ybase = top + rows * cell_h + gap_group + 14
+    for wi, b in enumerate(dist):
+        if wi % label_every == 0 or wi == n - 1:
+            x = left + wi * cell_w + cell_w / 2
+            parts.append(
+                f'<text x="{x:.1f}" y="{ybase}" text-anchor="middle" font-size="9" '
+                f'fill="{PALETTE["mute"]}">{html.escape(b["week"].split("-")[-1])}</text>'
+            )
+    svg = (f'<svg viewBox="0 0 {width} {height}" width="{max(width, 320)}" height="{height}" '
+           f'role="img">{"".join(parts)}</svg>')
+    return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
 
 def _stat_card(label, value, sub=""):
     sub_html = f'<div class="stat-sub">{html.escape(sub)}</div>' if sub else ""
@@ -341,6 +468,9 @@ def render_html(files, summary, history):
         missing_html = (f'<div class="warn"><b>掃描目錄缺失</b>（未計入）：<ul>{items}</ul></div>')
 
     # 本週新增檔清單
+    basis = summary.get("date_basis", "modified")
+    b_created = " (基準)" if basis == "created" else ""
+    b_modified = " (基準)" if basis == "modified" else ""
     if week_files:
         rows = []
         for f in week_files[:200]:
@@ -348,17 +478,23 @@ def render_html(files, summary, history):
                 f'<span class="ring-tag">{html.escape(r.replace("總綱","綱").replace("總經","經"))}·{s:g}</span>'
                 for r, (_c, s) in sorted(f["rings"].items(), key=lambda kv: -kv[1][1])
             ) or '<span class="ring-none">—</span>'
+            # 建立==修改 標一致；不同則標出（複製污染的線索）
+            same = f["created"][:16] == f["modified"][:16]
+            cre_cls = "" if basis != "created" else ' style="font-weight:600"'
+            mod_cls = "" if basis != "modified" else ' style="font-weight:600"'
             rows.append(
                 f'<tr><td class="fn" title="{html.escape(f["path"])}">{html.escape(f["name"])}</td>'
-                f'<td>{f["mtime"][:16].replace("T"," ")}</td>'
+                f'<td{cre_cls}>{f["created"][:16].replace("T"," ")}</td>'
+                f'<td{mod_cls}>{f["modified"][:16].replace("T"," ")}</td>'
                 f'<td class="num">{f["lines"]:,}</td>'
                 f'<td class="num">{f["chars"]:,}</td>'
                 f'<td class="enc">{html.escape(f["encoding"])}</td>'
                 f'<td class="rings">{ring_tags}</td></tr>'
-                f'<tr class="preview"><td colspan="6">{html.escape(f["first_line"])}</td></tr>'
+                f'<tr class="preview"><td colspan="7">{html.escape(f["first_line"])}</td></tr>'
             )
         week_table = (
-            '<table class="ftable"><thead><tr><th>檔名</th><th>修改時間</th>'
+            '<table class="ftable"><thead><tr><th>檔名</th>'
+            f'<th>建立時間{b_created}</th><th>修改時間{b_modified}</th>'
             '<th class="num">行</th><th class="num">字元</th><th>編碼</th>'
             '<th>環次命中(強度)</th></tr></thead><tbody>'
             + "".join(rows) + "</tbody></table>"
@@ -366,7 +502,7 @@ def render_html(files, summary, history):
         if len(week_files) > 200:
             week_table += f'<div class="mute">（僅列前 200 筆，本週共 {len(week_files)} 筆）</div>'
     else:
-        week_table = '<div class="empty">本週無新增素材（依檔案修改時間判定）</div>'
+        week_table = f'<div class="empty">本週無新增素材（依檔案{"建立" if basis=="created" else "修改"}日期判定）</div>'
 
     generated = summary["asof"].replace("T", " ")
 
@@ -426,7 +562,7 @@ def render_html(files, summary, history):
 <body>
 <div class="wrap">
   <h1>相閘 XiangGate · 素材週報</h1>
-  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)}</div>
+  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)} ｜ 匯入日期基準：<b>{'建立日期' if summary.get('date_basis')=='created' else '修改日期'}</b></div>
   <div class="motto">相入 · 閘決 · Edward 坍縮 · 軸不動，θ 趨近。</div>
 
   {missing_html}
@@ -464,11 +600,22 @@ def render_html(files, summary, history):
   </section>
 
   <section>
-    <h2>每週趨勢（不遺忘 · append-only）</h2>
-    <div class="chart-title">每週新增字元量</div>
-    {_trend_svg(history, 'week_chars')}
-    <div class="chart-title" style="margin-top:14px">每週新增素材數</div>
-    {_trend_svg(history, 'week_files')}
+    <h2>環次命中 · 時間趨勢（依{'建立' if summary.get('date_basis')=='created' else '修改'}週 · 熱區圖）</h2>
+    <div class="chart-title">11 環 × 週 ｜ 上 6 列＝總綱六環(teal)、下 5 列＝總經五環(jade) ｜ 色深＝該週該環累計強度</div>
+    {_ring_heatmap_svg(summary['week_distribution'], RING_ORDER_6, RING_ORDER_5)}
+    <div class="note">規格 §5「環次每週 11 線趨勢」的熱區版——哪一環在哪幾週發熱一眼看穿。
+      滑鼠移到格看週／環／強度。強度為關鍵詞啟發式（示範層 §9），正式版由對撞引擎判定。</div>
+  </section>
+
+  <section>
+    <h2>素材時間分佈 · 全庫（依{'建立' if summary.get('date_basis')=='created' else '修改'}週）</h2>
+    <div class="chart-title">每週素材數（共 {len(summary['week_distribution'])} 週 · {summary['total_files']:,} 檔）</div>
+    {_histogram_svg(summary['week_distribution'], 'files', P['gold'])}
+    <div class="chart-title" style="margin-top:14px">每週字元量</div>
+    {_histogram_svg(summary['week_distribution'], 'chars', P['jade'])}
+    <div class="note">全庫回溯：每檔依其{'建立' if summary.get('date_basis')=='created' else '修改'}日期歸入 ISO 週，
+      即時計算（規格 §5），非腳本執行紀錄。滑鼠移到長條看該週檔數／字元。
+      history.json 仍每週追加做不遺忘稽核。</div>
   </section>
 
   <section>
@@ -486,11 +633,31 @@ def render_html(files, summary, history):
 # 主流程
 # ============================================================
 
+def run_diag(scan_dirs, asof_dt, sample=30):
+    """診斷：列出樣本檔的建立 vs 修改日期，看哪個被複製動作污染成今天。"""
+    files, summary = gather(scan_dirs, EXTENSIONS, asof_dt)
+    today = asof_dt.date().isoformat()
+    cre_today = sum(1 for f in files if f["created"][:10] == today)
+    mod_today = sum(1 for f in files if f["modified"][:10] == today)
+    print(f"[診斷] 掃到 {len(files)} 檔  as-of {today}")
+    print(f"  建立日期＝今天的檔數：{cre_today}  （{cre_today*100//max(1,len(files))}%）")
+    print(f"  修改日期＝今天的檔數：{mod_today}  （{mod_today*100//max(1,len(files))}%）")
+    print(f"  建立≠修改 的檔數    ：{sum(1 for f in files if f['created'][:16]!=f['modified'][:16])}")
+    print(f"  → 若「建立日期＝今天」佔比異常高，代表檔案是被複製進來的，改用 DATE_BASIS='modified'\n")
+    print(f"{'檔名':<40} {'建立':<17} {'修改':<17}")
+    print("-" * 78)
+    for f in files[:sample]:
+        nm = (f["name"][:38] + "..") if len(f["name"]) > 40 else f["name"]
+        print(f"{nm:<40} {f['created'][:16]:<17} {f['modified'][:16]:<17}")
+    if len(files) > sample:
+        print(f"...（僅列前 {sample} 筆，共 {len(files)} 筆）")
+
 def main():
     ap = argparse.ArgumentParser(description="相閘週報產生器")
     ap.add_argument("--dirs", nargs="+", help="覆寫掃描目錄")
     ap.add_argument("--out", help="覆寫輸出目錄")
     ap.add_argument("--asof", help="固定 as-of 日期(YYYY-MM-DD，僅測試用)；預設 now()")
+    ap.add_argument("--diag", action="store_true", help="診斷模式：對照建立vs修改日期，不產報告")
     args = ap.parse_args()
 
     scan_dirs = args.dirs if args.dirs else SCAN_DIRS
@@ -499,6 +666,10 @@ def main():
         asof_dt = datetime.strptime(args.asof, "%Y-%m-%d")
     else:
         asof_dt = datetime.now()  # 日期鐵律：以執行當下為錨
+
+    if args.diag:
+        run_diag(scan_dirs, asof_dt)
+        return 0
 
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(os.path.join(out_dir, "reports"), exist_ok=True)
@@ -517,6 +688,7 @@ def main():
         f.write(page)
 
     print(f"[相閘週報] {summary['week_key']}  as-of {summary['asof']}")
+    print(f"  匯入日期基準: {summary['date_basis']}（{'建立日期' if summary['date_basis']=='created' else '修改日期'}）")
     print(f"  掃描目錄  : {scan_dirs}")
     if summary["missing_dirs"]:
         print(f"  ⚠ 缺目錄  : {summary['missing_dirs']}")

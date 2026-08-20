@@ -12,7 +12,7 @@ C:\Users\ed249\Downloads\xianggate-site\
 ├─ run_weekly.bat          排程觸發（產報告→git push）
 ├─ README_部署.md          本文件
 ├─ index.html              產出：最新一週首頁（自動生成，勿手改）
-├─ history.json            產出：每週趨勢快照（append-only，勿手刪）
+├─ history.json            產出：每週執行快照（append-only 稽核，勿手刪）
 └─ reports\                產出：每週封存 YYYY-Www.html
 ```
 
@@ -85,7 +85,9 @@ schtasks /Create /TN "XiangGate_Weekly" /TR "\"C:\Users\ed249\Downloads\xianggat
 - [ ] 先手測 `python xianggate_weekly.py`，開 index.html 確認畫面無誤
 - [ ] git init + 首推成功、Pages 網址開得出來
 - [ ] schtasks 建立，`schtasks /Run` 手動觸發一次，run_log.txt 有「已 push」
-- [ ] 確認 history.json、reports\ 有進 git（趨勢圖靠歷史累積，勿被 .gitignore 擋掉）
+- [ ] 確認 history.json、reports\ 有進 git（勿被 .gitignore 擋掉）
+- [ ] 趨勢區＝全庫回溯直方圖（依修改週即時計算），非執行紀錄；週數多時可橫向捲動
+- [ ] 環次命中時間趨勢＝11環×週熱區圖（規格 §5「11線趨勢」熱區版），色深＝該週該環強度
 
 ---
 
@@ -93,6 +95,10 @@ schtasks /Create /TN "XiangGate_Weekly" /TR "\"C:\Users\ed249\Downloads\xianggat
 
 1. **環次命中關鍵詞**：現為示範層啟發式（規格 §9）。RING_KEYWORDS 在 py 檔頭可編。
    正式版應由對撞引擎逐命題判定 —— 這是 Fork B（接後端）的活，本週報是 Fork A（先讓它轉）。
-2. **週窗定義**：現用 ISO 週（週一起算），「本週新增」＝檔案 mtime ≥ 本週一。
-   若要改「上次跑到這次跑之間」的增量窗，回報改。
+2. **匯入日期基準（DATE_BASIS）**：py 檔頭開關，`'created'`＝建立日期／`'modified'`＝修改日期。
+   **現預設 `'modified'`**——因你的檔多是複製/移動進資料夾，Windows 會把「建立日期」重設成
+   複製當下（全變今天），修改日期才保留原始時間。跑 `python xianggate_weekly.py --diag`
+   看兩者實際差多少：若「建立日期＝今天」佔比異常高 → 維持 `'modified'`；若你的檔是原地生成
+   （建立日期可信）→ 改回 `'created'`。報告頭部與表格會同時顯示兩個日期並標出當前基準。
+   週窗：ISO 週（週一起算），「本週新增」＝該基準日期 ≥ 本週一。
 3. **報告只給方位**：不做結論、不替你坍縮（守規格 §10）。要不要把某環升格、駁回，走週閘。
