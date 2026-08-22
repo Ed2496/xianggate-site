@@ -1,45 +1,31 @@
 @echo off
 chcp 65001 >nul
-setlocal enabledelayedexpansion
-REM ============================================================
-REM 相閘週報 · 每週五自動執行
-REM 觸發：Windows Task Scheduler（OpenClaw 已廢，不假設常駐服務）
-REM 動作：產報告(Cpk 寫檔) → git add/commit/push(Cpk 版本/上傳)
-REM ============================================================
-
-set "REPO=C:\Users\ed249\Downloads\xianggate-site"
-set "LOG=%REPO%\run_log.txt"
-
-cd /d "%REPO%" 2>nul
-if errorlevel 1 (
-  echo [%date% %time%] [ERROR] repo 不存在: %REPO%
-  exit /b 1
-)
+REM 相閘 週報 v1.9 ｜ 四境→五境→報告→推 Pages ｜ Task Scheduler 週五觸發
+REM 修正：git push 失敗時不再印 pushed（原 run_log 第12行 fatal 卻印 pushed）
+set SITE=C:\Users\ed249\Downloads\xianggate-site
+set PY=C:\Users\ed249\Downloads\xianggate
+set LOG=%SITE%\run_log.txt
 
 echo ============================================== >> "%LOG%"
-echo [%date% %time%] 開始執行相閘週報 >> "%LOG%"
+echo [%date% %time%] START >> "%LOG%"
 
-REM 1) 產報告（掃描 → 環次命中 → HTML → history append）
-python "%REPO%\xianggate_weekly.py" >> "%LOG%" 2>&1
+cd /d "%PY%"
+python xianggate_weekly.py >> "%LOG%" 2>&1
 if errorlevel 1 (
-  echo [%date% %time%] [ERROR] 產報告失敗，中止（未 push） >> "%LOG%"
-  exit /b 1
+  echo [%date% %time%] WEEKLY FAILED >> "%LOG%"
+  goto :end
 )
+REM 第五境已由 weekly 內嵌呼叫；此行為保險：若需單獨重跑可取消註解
+REM python xianggate_lambda.py >> "%LOG%" 2>&1
 
-REM 2) git 推送
+cd /d "%SITE%"
 git add -A >> "%LOG%" 2>&1
-git diff --cached --quiet
+git commit -m "xianggate weekly %date%" >> "%LOG%" 2>&1
+git push >> "%LOG%" 2>&1
 if errorlevel 1 (
-  git commit -m "相閘週報 %date%" >> "%LOG%" 2>&1
-  git push >> "%LOG%" 2>&1
-  if errorlevel 1 (
-    echo [%date% %time%] [ERROR] git push 失敗（檢查認證/網路） >> "%LOG%"
-    exit /b 1
-  )
-  echo [%date% %time%] 已 push 到 GitHub Pages >> "%LOG%"
+  echo [%date% %time%] PUSH FAILED ^(check: git remote -v^) >> "%LOG%"
 ) else (
-  echo [%date% %time%] 無變更，跳過 commit/push >> "%LOG%"
+  echo [%date% %time%] pushed >> "%LOG%"
 )
-
-echo [%date% %time%] 完成 >> "%LOG%"
-endlocal
+:end
+echo [%date% %time%] DONE >> "%LOG%"

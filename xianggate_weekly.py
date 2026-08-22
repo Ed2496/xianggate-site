@@ -30,6 +30,15 @@ import argparse
 import hashlib
 from datetime import datetime, timedelta, date
 
+# ── 增量 v1.9：相行體用標記層（第四境資料層）＋第五境 Λ 陳述 ──
+# 模組缺檔時自動降級為原 v1.8 行為，舊圖表/舊流程零改動。
+try:
+    import xianggate_mark as XM
+    _MARK_OK = True
+except ImportError:
+    XM = None
+    _MARK_OK = False
+
 # ============================================================
 # 可編設定區（坍縮權：Edward）
 # ============================================================
@@ -60,6 +69,17 @@ DATE_BASIS = "modified"
 #         GitHub Pages 站台一律公開(即使 repo 私有)，逐字稿檔名與內容首句會被全網索引。
 # False ＝ 顯示完整逐檔表(僅在你確認素材皆非敏感、或只在本機開時使用)。
 PUBLIC_SAFE = True
+
+# ── 標記層設定（坍縮權：Edward）──────────────────────────────
+# MARK_ENABLED  ＝ True 時每檔同時做相行體用標記，寫 OUTPUT_DIR/xianggate.db(mark_chain 等三表)
+# DB_NAME       ＝ 與第五境共用的 sqlite 檔名（只建新表，不碰既有表）
+# TERMS_SUBDIR  ＝ 詞表資料夾（第一次跑自動吐預設 TXT，之後改 TXT 不改碼）
+MARK_ENABLED = True
+DB_NAME = "xianggate.db"
+TERMS_SUBDIR = "terms"
+LAYER_NAMES = ["相", "行", "體", "用"]
+_TERMS = None  # 延遲載入
+XG_VERSION = "v1.9.2"  # 相閘週報版本（顯示於報告標題列）
 
 # 讀檔嘗試編碼順序（台灣 Windows：utf-8 / cp950(Big5) 混用是常態）
 ENCODINGS = ["utf-8-sig", "utf-8", "cp950", "big5", "gb18030", "latin-1"]
@@ -194,6 +214,12 @@ def gather(scan_dirs, extensions, asof_dt):
                 created = datetime.fromtimestamp(created_ts)
                 modified = datetime.fromtimestamp(mtime_ts)
                 rings = scan_rings(text)
+                # 增量 v1.9：相行體用標記 + 環序（只在有命中環時算，避免無環空轉）
+                mark = None
+                ring_seq = {}
+                if _MARK_OK and MARK_ENABLED and _TERMS is not None and rings:
+                    mark = XM.mark_text(text, _TERMS, public_safe=PUBLIC_SAFE)
+                    ring_seq = XM.ring_sequence(text, RING_KEYWORDS)
                 files.append({
                     "path": fpath,
                     "name": fn,
@@ -213,6 +239,8 @@ def gather(scan_dirs, extensions, asof_dt):
                     "rings": rings,
                     "first_line": extract_first_substantial(text),
                     "sha256": sha256_text(text)[:16],
+                    "mark": mark,          # 增量 v1.9
+                    "ring_seq": ring_seq,  # 增量 v1.9
                 })
 
     files.sort(key=lambda x: x["basis_ts"], reverse=True)
@@ -237,14 +265,46 @@ def gather(scan_dirs, extensions, asof_dt):
     for f in files:
         wk = iso_week_key(datetime.fromtimestamp(f["basis_ts"]).date())
         b = dist.setdefault(wk, {"week": wk, "files": 0, "chars": 0,
-                                 "rings": {r: 0.0 for r in all_rings}})
+                                 "rings": {r: 0.0 for r in all_rings},
+                                 # 增量 v1.9：每環 depth 合計/檔數（供 depth 熱圖），每週四層合計（供堆疊條）
+                                 "depth_sum": {r: 0.0 for r in all_rings},
+                                 "depth_n": {r: 0 for r in all_rings},
+                                 "layer_sum": [0.0, 0.0, 0.0, 0.0], "layer_n": 0})
         b["files"] += 1
         b["chars"] += f["chars"]
         for r, (_cnt, strength) in f["rings"].items():
             b["rings"][r] += strength
+        if f.get("mark"):
+            for r in f["rings"]:
+                b["depth_sum"][r] += f["mark"]["depth"]
+                b["depth_n"][r] += 1
+            for i in range(4):
+                b["layer_sum"][i] += f["mark"]["layer_vec"][i]
+            b["layer_n"] += 1
     for b in dist.values():
         b["rings"] = {r: round(v, 3) for r, v in b["rings"].items()}
+        b["depth_avg"] = {r: (round(b["depth_sum"][r] / b["depth_n"][r], 3) if b["depth_n"][r] else None)
+                          for r in all_rings}
+        b["layer_avg"] = ([round(v / b["layer_n"], 3) for v in b["layer_sum"]] if b["layer_n"] else None)
     week_distribution = sorted(dist.values(), key=lambda d: d["week"])
+
+    # 增量 v1.9：本週 mark_chain 列（一檔 × 一環 一筆）與環級 depth 週均（供 history / sigma）
+    mark_rows = []
+    ring_depth_week = {}
+    for f in week_files:
+        if not f.get("mark"):
+            continue
+        m = f["mark"]
+        for r in f["rings"]:
+            mark_rows.append({
+                "text_id": f["sha256"], "week_key": iso_week_key(asof_date), "ring_id": r,
+                "ring_seq": f["ring_seq"].get(r), "depth": m["depth"], "layer_vec": m["layer_vec"],
+                "mobius": m["mobius"], "mobius_pair": m["mobius_pair"], "klein": m["klein"],
+                "q_state": m["q_state"], "src": "rule", "asof": asof_dt.isoformat(timespec="seconds"),
+            })
+    for r in all_rings:
+        ds = [row["depth"] for row in mark_rows if row["ring_id"] == r]
+        ring_depth_week[r] = round(sum(ds) / len(ds), 3) if ds else None
 
     summary = {
         "asof": asof_dt.isoformat(timespec="seconds"),
@@ -262,6 +322,10 @@ def gather(scan_dirs, extensions, asof_dt):
         "ring_total": {r: round(v, 3) for r, v in ring_total.items()},
         "ring_week": {r: round(v, 3) for r, v in ring_week.items()},
         "ring_files": ring_files,
+        "mark_rows": mark_rows,              # 增量 v1.9
+        "ring_depth_week": ring_depth_week,  # 增量 v1.9
+        "lambda": {},                        # 增量 v1.9：由 main 填入第五境 Λ 陳述
+        "ring_stats": [],                    # 增量 v1.9：由 main 填入環級統計(含 sigma)
     }
     return files, summary
 
@@ -287,6 +351,7 @@ def update_history(out_dir, summary):
         "week_chars": summary["week_chars"],
         "ring_week": summary["ring_week"],
         "ring_total": summary["ring_total"],
+        "ring_depth": summary.get("ring_depth_week", {}),  # 增量 v1.9：供 sigma 四週回看
     }
     # 同週覆寫(重跑不增筆)，否則追加
     hist = [h for h in hist if h.get("week_key") != summary["week_key"]]
@@ -499,6 +564,327 @@ def _ring_heatmap_svg(dist, rings_6, rings_5):
            f'role="img">{"".join(parts)}</svg>')
     return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
 
+# ============================================================
+# 增量 v1.9：標記層視覺化（新增函式，不改既有）
+# ============================================================
+
+def _depth_color(v):
+    """depth 0–4 → 色：相(紅)→行(橙)→體(teal)→用(jade)；None → 空。"""
+    if v is None:
+        return "#F2F7F5", 0.0
+    # 線性插值在四個錨色之間
+    anchors = [(1, (194, 57, 62)), (2, (217, 119, 6)), (3, (15, 118, 110)), (4, (14, 138, 109))]
+    v = max(1.0, min(4.0, v))
+    for (a, ca), (b, cb) in zip(anchors, anchors[1:]):
+        if a <= v <= b:
+            t = (v - a) / (b - a)
+            rgb = tuple(int(ca[i] + (cb[i] - ca[i]) * t) for i in range(3))
+            return "#%02x%02x%02x" % rgb, 0.9
+    return "#%02x%02x%02x" % anchors[0][1], 0.9
+
+def _depth_heatmap_svg(dist, rings_6, rings_5):
+    """截斷深度熱圖：環當列、週當欄、色＝該週該環平均 depth（1 相 → 4 用）。"""
+    if not dist or not any(b.get("depth_avg") for b in dist):
+        return '<div class="empty">尚無標記資料</div>'
+    rings = rings_6 + rings_5
+    n = len(dist)
+    cell_w = max(9, min(26, int(760 / n)))
+    cell_h = 17
+    left = 46
+    top = 6
+    gap_group = 6
+    rows = len(rings)
+    height = top + rows * cell_h + gap_group + 22
+    width = left + n * cell_w + 6
+    label_every = max(1, n // 14)
+
+    def short(r):
+        return r.replace("總綱環", "綱").replace("總經環", "經")
+
+    parts = []
+    for ri, r in enumerate(rings):
+        extra = gap_group if r in rings_5 else 0
+        ry = top + ri * cell_h + extra
+        parts.append(
+            f'<text x="{left - 6}" y="{ry + cell_h*0.7:.1f}" text-anchor="end" '
+            f'font-size="10" fill="{PALETTE["paper"]}">{html.escape(short(r))}</text>'
+        )
+        for wi, b in enumerate(dist):
+            v = (b.get("depth_avg") or {}).get(r)
+            x = left + wi * cell_w
+            fill, op = _depth_color(v)
+            vtxt = "—" if v is None else f"{v:.2f}"
+            parts.append(
+                f'<rect x="{x}" y="{ry:.1f}" width="{cell_w-1}" height="{cell_h-1}" '
+                f'rx="1.5" fill="{fill}" fill-opacity="{op}">'
+                f'<title>{html.escape(b["week"])} ｜ {html.escape(short(r))} ｜ depth {vtxt}</title></rect>'
+            )
+    ybase = top + rows * cell_h + gap_group + 14
+    for wi, b in enumerate(dist):
+        if wi % label_every == 0 or wi == n - 1:
+            x = left + wi * cell_w + cell_w / 2
+            parts.append(
+                f'<text x="{x:.1f}" y="{ybase}" text-anchor="middle" font-size="9" '
+                f'fill="{PALETTE["mute"]}">{html.escape(b["week"].split("-")[-1])}</text>'
+            )
+    svg = (f'<svg viewBox="0 0 {width} {height}" width="{max(width, 320)}" height="{height}" '
+           f'role="img">{"".join(parts)}</svg>')
+    return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
+
+def _layer_stack_svg(dist, height=200):
+    """四層堆疊條：每週 [相,行,體,用] 平均占比堆疊到 100%。相層壓倒其餘即碎念載波。"""
+    weeks = [b for b in dist if b.get("layer_avg")]
+    if not weeks:
+        return '<div class="empty">尚無標記資料</div>'
+    n = len(weeks)
+    bar_w = max(6, min(30, int(760 / n)))
+    gap = max(2, bar_w // 3)
+    width = n * (bar_w + gap) + gap
+    base = height - 26
+    plot_h = base - 18
+    colors = [PALETTE["red"], "#D97706", PALETTE["gold"], PALETTE["jade"]]
+    label_every = max(1, n // 14)
+    parts = [f'<text x="{gap}" y="12" font-size="10" fill="{PALETTE["mute"]}">'
+             f'由下而上：相(紅) 行(橙) 體(teal) 用(jade)</text>']
+    for i, b in enumerate(weeks):
+        x = gap + i * (bar_w + gap)
+        y = base
+        tot = sum(b["layer_avg"]) or 1
+        for li in range(4):
+            frac = b["layer_avg"][li] / tot
+            h = frac * plot_h
+            y -= h
+            parts.append(
+                f'<rect x="{x}" y="{y:.1f}" width="{bar_w}" height="{h:.1f}" fill="{colors[li]}">'
+                f'<title>{html.escape(b["week"])} ｜ {LAYER_NAMES[li]} {frac*100:.0f}%</title></rect>'
+            )
+        if i % label_every == 0 or i == n - 1:
+            parts.append(
+                f'<text x="{x + bar_w/2:.1f}" y="{height - 8}" text-anchor="middle" '
+                f'font-size="9" fill="{PALETTE["mute"]}">{html.escape(b["week"].split("-")[-1])}</text>'
+            )
+    svg = (f'<svg viewBox="0 0 {width} {height}" width="{max(width, 320)}" height="{height}" '
+           f'role="img">{"".join(parts)}</svg>')
+    return f'<div style="overflow-x:auto;padding-bottom:4px">{svg}</div>'
+
+def _sigma_line_svg(history, rings_6, rings_5, ring_stats=None, height=360, pad=44, top_rings=4):
+    """σ 趨勢線(depth 版)：每環一條，y＝該週 avg depth。
+    主環(本週命中最多的 top_rings 條)實線描粗、其餘淡化為背景。圖內含閱讀註解。"""
+    hs = [h for h in history if h.get("ring_depth")]
+    if len(hs) < 1:
+        return '<div class="empty">尚無歷史（需至少一週 ring_depth；可先跑 xianggate_backfill.py）</div>'
+    rings = rings_6 + rings_5
+    n = len(hs)
+    # 決定主環：依 ring_stats 本週命中檔數排序取前 top_rings；無則取最後一週 depth 非空者
+    focus = []
+    if ring_stats:
+        focus = [s["ring_id"] for s in sorted(ring_stats, key=lambda s: -(s["n_files"] or 0))
+                 if s["n_files"]][:top_rings]
+    if not focus:
+        last = hs[-1]["ring_depth"]
+        focus = [r for r in rings if last.get(r) is not None][:top_rings]
+
+    right_pad = 60  # 右側留給環標籤
+    width = max(560, n * 46 + pad + right_pad)
+    inner_w = width - pad - right_pad
+    inner_h = height - pad - 40  # 底部留週標
+    x_at = lambda i: pad + (inner_w * (i / (n - 1)) if n > 1 else inner_w / 2)
+    y_at = lambda v: pad + inner_h - ((max(1, min(4, v)) - 1) / 3) * inner_h
+
+    parts = []
+    # 四層基準帶（相/行/體/用），交錯淡底幫助讀 y
+    band_colors = ["#FBEDED", "#FBF0E3", "#EAF3F1", "#E6F2ED"]
+    for lvl in (1, 2, 3, 4):
+        yb = y_at(lvl)
+        parts.append(f'<line x1="{pad}" y1="{yb:.1f}" x2="{pad+inner_w:.1f}" y2="{yb:.1f}" '
+                     f'stroke="{PALETTE["line"]}" stroke-dasharray="3,3"/>')
+        parts.append(f'<text x="{pad-8}" y="{yb+4:.1f}" text-anchor="end" font-size="13" '
+                     f'font-weight="600" fill="{PALETTE["paper"]}">{LAYER_NAMES[lvl-1]}</text>')
+        parts.append(f'<text x="{pad-8}" y="{yb+17:.1f}" text-anchor="end" font-size="9" '
+                     f'fill="{PALETTE["mute"]}">{lvl}</text>')
+
+    def draw_ring(r, focus_mode):
+        color = PALETTE["gold"] if r in rings_6 else PALETTE["jade"]
+        coords = []
+        for i, h in enumerate(hs):
+            v = h["ring_depth"].get(r)
+            if v is None:
+                continue
+            coords.append((x_at(i), y_at(v), h["week_key"], v))
+        if not coords:
+            return
+        if focus_mode:
+            sw, op, dot = 2.6, 0.95, 3.4
+        else:
+            sw, op, dot = 1.0, 0.16, 1.8
+        if len(coords) > 1:
+            poly = " ".join(f"{x:.1f},{y:.1f}" for x, y, _w, _v in coords)
+            parts.append(f'<polyline points="{poly}" fill="none" stroke="{color}" '
+                         f'stroke-opacity="{op:.2f}" stroke-width="{sw}"/>')
+        for x, y, w, v in coords:
+            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{dot}" fill="{color}" '
+                         f'fill-opacity="{op:.2f}"><title>{html.escape(w)} ｜ {html.escape(r)} ｜ depth {v:.2f}</title></circle>')
+        if focus_mode:
+            # 末點標環名＋值於右側
+            lx, ly, _lw, lv = coords[-1]
+            parts.append(f'<text x="{lx+6:.1f}" y="{ly+3:.1f}" font-size="11" font-weight="600" '
+                         f'fill="{color}">{html.escape(r.replace("總綱環","綱").replace("總經環","經"))} {lv:.1f}</text>')
+
+    # 先畫背景(非主環)，再畫主環蓋上
+    for r in rings:
+        if r not in focus:
+            draw_ring(r, False)
+    for r in focus:
+        draw_ring(r, True)
+
+    # 週標籤(稀疏)
+    label_every = max(1, n // 16)
+    for i, h in enumerate(hs):
+        if i % label_every == 0 or i == n - 1:
+            x = x_at(i)
+            parts.append(f'<text x="{x:.1f}" y="{height - 20}" text-anchor="middle" font-size="9" '
+                         f'fill="{PALETTE["mute"]}" transform="rotate(0)">{html.escape(h["week_key"].split("-")[-1])}</text>')
+    # 圖內閱讀註解（左上角）
+    parts.append(
+        f'<text x="{pad}" y="18" font-size="11" fill="{PALETTE["paper"]}" font-weight="600">'
+        f'實線＝本週主環（命中最多）　淡線＝其餘環（背景）</text>'
+        f'<text x="{pad}" y="32" font-size="10" fill="{PALETTE["mute"]}">'
+        f'點越高＝標記鏈標到越深（用層）；越低＝停在相層（碎念/兩本帳）。線往下走＝該環在退回相層。</text>'
+    )
+    return (f'<svg viewBox="0 0 {width} {height}" width="100%" '
+            f'preserveAspectRatio="xMidYMid meet" role="img" style="min-height:{height}px">{"".join(parts)}</svg>')
+
+def _sigma_value_svg(history, rings_6, rings_5, ring_stats=None, height=300, pad=44, top_rings=4):
+    """σ 值圖：y＝週對前四週的 depth 變化率(σ)。0＝持平(攻守易位線)，>0 標記鏈延伸，<0 截斷加深。"""
+    hs = [h for h in history if h.get("ring_depth")]
+    if len(hs) < 2:
+        return '<div class="empty">σ 值需至少兩週歷史</div>'
+    rings = rings_6 + rings_5
+    n = len(hs)
+    # 逐環逐週算 σ = (本週 depth − 前最多四週 depth 均) / 4
+    series = {r: [] for r in rings}
+    for r in rings:
+        seq = [(h["week_key"], h["ring_depth"].get(r)) for h in hs]
+        for i, (wk, v) in enumerate(seq):
+            if v is None:
+                series[r].append((wk, None)); continue
+            prev = [pv for _pw, pv in seq[max(0, i-4):i] if pv is not None]
+            if not prev:
+                series[r].append((wk, None))
+            else:
+                series[r].append((wk, (v - sum(prev)/len(prev)) / 4))
+    # 主環
+    focus = []
+    if ring_stats:
+        focus = [s["ring_id"] for s in sorted(ring_stats, key=lambda s: -(s["n_files"] or 0))
+                 if s["n_files"]][:top_rings]
+    if not focus:
+        focus = [r for r in rings if any(v is not None for _w, v in series[r])][:top_rings]
+
+    all_vals = [v for r in rings for _w, v in series[r] if v is not None]
+    vmax = max([abs(x) for x in all_vals], default=1.0) or 1.0
+    right_pad = 60
+    width = max(560, n * 46 + pad + right_pad)
+    inner_w = width - pad - right_pad
+    inner_h = height - pad - 40
+    x_at = lambda i: pad + (inner_w * (i / (n - 1)) if n > 1 else inner_w / 2)
+    y0 = pad + inner_h / 2  # 0 線在中間
+    y_at = lambda v: y0 - (v / vmax) * (inner_h / 2)
+
+    parts = []
+    # 0 線（攻守易位線）粗紅
+    parts.append(f'<line x1="{pad}" y1="{y0:.1f}" x2="{pad+inner_w:.1f}" y2="{y0:.1f}" '
+                 f'stroke="{PALETTE["red"]}" stroke-width="1.6"/>')
+    parts.append(f'<text x="{pad-8}" y="{y0+4:.1f}" text-anchor="end" font-size="10" '
+                 f'font-weight="600" fill="{PALETTE["red"]}">0</text>')
+    parts.append(f'<text x="{pad-8}" y="{pad+10:.1f}" text-anchor="end" font-size="9" fill="{PALETTE["mute"]}">+{vmax:.2f}</text>')
+    parts.append(f'<text x="{pad-8}" y="{pad+inner_h-2:.1f}" text-anchor="end" font-size="9" fill="{PALETTE["mute"]}">−{vmax:.2f}</text>')
+
+    def draw(r, fm):
+        color = PALETTE["gold"] if r in rings_6 else PALETTE["jade"]
+        coords = [(x_at(i), y_at(v), wk, v) for i, (wk, v) in enumerate(series[r]) if v is not None]
+        if not coords:
+            return
+        sw, op, dot = (2.6, 0.95, 3.4) if fm else (1.0, 0.14, 1.6)
+        if len(coords) > 1:
+            poly = " ".join(f"{x:.1f},{y:.1f}" for x, y, _w, _v in coords)
+            parts.append(f'<polyline points="{poly}" fill="none" stroke="{color}" '
+                         f'stroke-opacity="{op:.2f}" stroke-width="{sw}"/>')
+        for x, y, wk, v in coords:
+            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{dot}" fill="{color}" fill-opacity="{op:.2f}">'
+                         f'<title>{html.escape(wk)} ｜ {html.escape(r)} ｜ σ {v:+.3f}</title></circle>')
+        if fm:
+            lx, ly, _w, lv = coords[-1]
+            parts.append(f'<text x="{lx+6:.1f}" y="{ly+3:.1f}" font-size="11" font-weight="600" fill="{color}">'
+                         f'{html.escape(r.replace("總綱環","綱").replace("總經環","經"))} {lv:+.2f}</text>')
+
+    for r in rings:
+        if r not in focus:
+            draw(r, False)
+    for r in focus:
+        draw(r, True)
+
+    label_every = max(1, n // 16)
+    for i, h in enumerate(hs):
+        if i % label_every == 0 or i == n - 1:
+            parts.append(f'<text x="{x_at(i):.1f}" y="{height - 20}" text-anchor="middle" font-size="9" '
+                         f'fill="{PALETTE["mute"]}">{html.escape(h["week_key"].split("-")[-1])}</text>')
+    parts.append(
+        f'<text x="{pad}" y="18" font-size="11" fill="{PALETTE["paper"]}" font-weight="600">'
+        f'紅線＝0（攻守易位線）</text>'
+        f'<text x="{pad}" y="32" font-size="10" fill="{PALETTE["mute"]}">'
+        f'點在紅線上方＝標記鏈本週在延伸（往用層）；下方＝截斷在加深（退回相層）；離紅線越遠＝變化越劇。</text>'
+    )
+    return (f'<svg viewBox="0 0 {width} {height}" width="100%" '
+            f'preserveAspectRatio="xMidYMid meet" role="img" style="min-height:{height}px">{"".join(parts)}</svg>')
+
+
+def _ring_stats_table(ring_stats):
+    """環級統計表：depth / σ / klein / q / mobius，依環序。"""
+    if not ring_stats:
+        return '<div class="empty">尚無環級統計</div>'
+    def f2(v, nd=2):
+        return "—" if v is None else f"{v:.{nd}f}"
+    rows = []
+    for s in ring_stats:
+        lv = s["layer_vec"]
+        main_layer = "—"
+        if lv and all(v is not None for v in lv):
+            main_layer = LAYER_NAMES[max(range(4), key=lambda i: lv[i])]
+        rows.append(
+            f'<tr><td class="fn">{html.escape(s["ring_id"].replace("總綱","綱").replace("總經","經"))}</td>'
+            f'<td class="num">{s["n_files"]}</td>'
+            f'<td class="num">{f2(s["avg_depth"])}</td>'
+            f'<td>{html.escape(main_layer)}</td>'
+            f'<td class="num">{f2(s["sigma"], 4)}</td>'
+            f'<td class="num">{s["klein_in"]}/{s["klein_out"]}</td>'
+            f'<td class="num">{s["q_collapse"]}/{s["q_super"]}/{s["q_reflex"]}</td>'
+            f'<td class="num">{s["mobius_cnt"]}</td></tr>'
+        )
+    return ('<table class="ftable"><thead><tr><th>環</th><th class="num">檔</th>'
+            '<th class="num">depth 均</th><th>主頻</th><th class="num">σ</th>'
+            '<th class="num">klein 內/外</th><th class="num">q 坍/疊/反</th><th class="num">mobius</th>'
+            '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+
+def _lambda_section_html(lambda_map, rings_6, rings_5):
+    """第五境 Λ 陳述：依環號順序，三態標色（定稿 jade / 候選 mute / 否決 灰刪除線）。"""
+    if not lambda_map:
+        return '<div class="empty">第五境尚未執行（xianggate_lambda.py）</div>'
+    cls = {"定稿": "lam-final", "候選": "lam-cand", "否決": "lam-reject"}
+    rows = []
+    for r in rings_6 + rings_5:
+        e = lambda_map.get(r)
+        if not e:
+            continue
+        st = e["status"]
+        rows.append(
+            f'<div class="lam {cls.get(st, "lam-cand")}">'
+            f'<span class="ring-tag">{html.escape(r.replace("總綱","綱").replace("總經","經"))}</span>'
+            f'<span class="lam-st">{html.escape(st)}</span>'
+            f'<span class="lam-txt">{html.escape(e["statement"] or "")}</span></div>'
+        )
+    return "".join(rows) or '<div class="empty">本週無 Λ 陳述</div>'
+
 def _stat_card(label, value, sub=""):
     sub_html = f'<div class="stat-sub">{html.escape(sub)}</div>' if sub else ""
     return (f'<div class="stat"><div class="stat-val">{html.escape(str(value))}</div>'
@@ -628,6 +1014,15 @@ def render_html(files, summary, history):
     .note{{color:var(--mute);font-size:12px;margin-top:8px}}
     footer{{color:var(--mute);font-size:12px;text-align:center;margin-top:26px;
       font-family:"Noto Serif TC",serif}}
+    /* 增量 v1.9：第五境 Λ 三態 */
+    .lam{{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #EDF3F0;font-size:13px}}
+    .lam-st{{font-size:11px;border-radius:6px;padding:1px 6px;white-space:nowrap;font-family:"JetBrains Mono",monospace}}
+    .lam-final .lam-st{{background:var(--jade);color:#fff}}
+    .lam-cand .lam-st{{background:var(--void);color:var(--mute);border:1px solid var(--line)}}
+    .lam-reject .lam-st{{background:#E5E7EB;color:#6B7280}}
+    .lam-reject .lam-txt{{color:#9CA3AF;text-decoration:line-through}}
+    .lam-cand .lam-txt{{color:var(--mute)}}
+    .legend{{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;margin:0 4px 0 8px}}
     """
 
     body = f"""<!DOCTYPE html>
@@ -641,7 +1036,7 @@ def render_html(files, summary, history):
 <body>
 <div class="wrap">
   <h1>相閘 XiangGate · 素材週報</h1>
-  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)} ｜ 匯入日期基準：<b>{'建立日期' if summary.get('date_basis')=='created' else '修改日期'}</b>{' ｜ <b>公開安全模式</b>' if PUBLIC_SAFE else ''}</div>
+  <div class="sub">{html.escape(summary['week_key'])} ｜ 週起 {html.escape(summary['week_start'])} ｜ 產出 {html.escape(generated)} ｜ 匯入日期基準：<b>{'建立日期' if summary.get('date_basis')=='created' else '修改日期'}</b>{' ｜ <b>公開安全模式</b>' if PUBLIC_SAFE else ''} ｜ <b>{html.escape(XG_VERSION)}</b>{f' ｜ 本次標記寫入 <b>{len(summary.get("mark_rows", []))}</b> 筆' if summary.get('mark_rows') is not None else ''}</div>
   <div class="motto">相入 · 閘決 · Edward 坍縮 · 軸不動，θ 趨近。</div>
 
   {missing_html}
@@ -702,6 +1097,47 @@ def render_html(files, summary, history):
     {week_table}
   </section>
 
+  <section>
+    <h2>第四境 · 標記層（相→行→體→用 × 五數學）</h2>
+    <div class="note" style="margin-bottom:10px">本次執行（{html.escape(summary['asof'].replace('T',' '))}）：新標記 <b>{len(summary.get('mark_rows', []))}</b> 筆
+      ｜ 本週命中檔 {sum(1 for f in files if f['is_new'] and f.get('mark'))} ｜ 全庫已標記週數 {sum(1 for b in summary['week_distribution'] if b.get('layer_n'))}
+      {'　⚠ 僅本週有標記，σ 趨勢／歷史熱圖需累積多週或執行回填 xianggate_backfill.py' if sum(1 for b in summary['week_distribution'] if b.get('layer_n')) <= 1 else ''}</div>
+    <div class="chart-title">截斷深度熱圖 ｜ 11 環 × 週 ｜ 色＝該週該環平均 depth：
+      <span class="legend" style="background:#C2393E"></span>相(1)
+      <span class="legend" style="background:#D97706"></span>行(2)
+      <span class="legend" style="background:#0F766E"></span>體(3)
+      <span class="legend" style="background:#0E8A6D"></span>用(4)</div>
+    {_depth_heatmap_svg(summary['week_distribution'], RING_ORDER_6, RING_ORDER_5)}
+    <div class="chart-title" style="margin-top:14px">四層堆疊條（傅立葉）｜ 每週標記鏈四層占比 ｜ 相層壓倒其餘＝碎念載波</div>
+    {_layer_stack_svg(summary['week_distribution'])}
+    <div class="chart-title" style="margin-top:14px">σ 趨勢線 A · depth 版（拉普拉斯）｜ 每環一條 ｜ y＝週平均 depth（相1→用4）</div>
+    {_sigma_line_svg(history, RING_ORDER_6, RING_ORDER_5, ring_stats=summary.get('ring_stats'))}
+    <div class="note" style="margin:6px 0 0">
+      <b>怎麼看這張圖</b>：橫軸＝週（左舊右新），縱軸＝標記鏈標到多深。<b>相(1)</b>在最底、<b>用(4)</b>在最頂。
+      <b>實線</b>是本週命中最多的主環（右端有環名＋數值），<b>淡線</b>是其餘環當背景。
+      一條線<b>往上爬</b>＝那個環的敘事越標越深（有追到行/體/用，責任錢流講清楚）；
+      <b>往下掉</b>＝退回相層（只剩碎念、兩本帳變濃）。線<b>長期貼底</b>的環＝長期截斷在相，是最該開探針的環。
+    </div>
+    <div class="chart-title" style="margin-top:16px">σ 趨勢線 B · 變化率版 ｜ y＝σ（本週對前四週的 depth 變化率）｜ <span style="color:#C2393E">紅線=0 攻守易位線</span></div>
+    {_sigma_value_svg(history, RING_ORDER_6, RING_ORDER_5, ring_stats=summary.get('ring_stats'))}
+    <div class="note" style="margin:6px 0 0">
+      <b>怎麼看這張圖</b>：這張看的是「<b>變化速度</b>」不是絕對深度。
+      點在<b>紅線上方</b>＝這週標記鏈在往深處延伸（好轉）；<b>紅線下方</b>＝截斷在加深（惡化）；
+      正好<b>穿過紅線</b>＝攻守易位那一刻（跟籌碼鑑識的攻守易位同型）。離紅線越遠代表那週變化越劇烈。
+    </div>
+    <div class="chart-title" style="margin-top:14px">本週環級讀數（σ 需四週歷史；klein／q／mobius 算不出即 —）</div>
+    {_ring_stats_table(summary.get('ring_stats', []))}
+    <div class="note">標記鏈在「相」截斷＝兩本帳（偵測層定義，不做意圖判斷）。規則判為示範層，詞表在 terms/*.txt 可改；
+      lambda TXT 手改後 src=hand 不被自動跑覆蓋。糾纏／觀測者中毒兩態留空待定義。命名／坍縮權屬 Edward。</div>
+  </section>
+
+  <section>
+    <h2>第五境 · Λ 陳述（依環號順序）</h2>
+    {_lambda_section_html(summary.get('lambda', {}), RING_ORDER_6, RING_ORDER_5)}
+    <div class="note">候選＝規則模板只給讀數與方位；定稿＝Edward 於 lambda/lambda_{html.escape(summary['week_key'])}.txt 裁定；否決＝留痕標灰。
+      定稿 Λ 下週回流為正典候選。刀收回，立命題。</div>
+  </section>
+
   <footer>相閘 · 系統做 90-99%，Edward 做 100% · 本報告只給方位/計數/命中，不做結論、不替 Edward 坍縮。</footer>
 </div>
 </body>
@@ -753,8 +1189,43 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(os.path.join(out_dir, "reports"), exist_ok=True)
 
+    # 增量 v1.9：載入詞表（第一次跑自動吐預設 TXT）
+    global _TERMS
+    if _MARK_OK and MARK_ENABLED:
+        terms_dir = os.path.join(out_dir, TERMS_SUBDIR)
+        XM.write_default_terms(terms_dir)
+        _TERMS = XM.load_terms(terms_dir)
+
     files, summary = gather(scan_dirs, EXTENSIONS, asof_dt)
     history = update_history(out_dir, summary)
+
+    # 增量 v1.9：第四境寫 db（mark_chain + ring_week_stats）→ 第五境候選 → 回讀 Λ 供 render
+    db_path = os.path.join(out_dir, DB_NAME)
+    if _MARK_OK and MARK_ENABLED:
+        all_rings = RING_ORDER_6 + RING_ORDER_5
+        # sigma 歷史：history.json 前幾週 ring_depth（排除本週）
+        hist_depth = {r: [] for r in all_rings}
+        for h in history:
+            if h["week_key"] == summary["week_key"]:
+                continue
+            for r in all_rings:
+                hist_depth[r].append((h.get("ring_depth") or {}).get(r))
+        ring_stats = XM.aggregate_ring_week(summary["mark_rows"], all_rings, summary["week_key"],
+                                            summary["asof"], history_depth=hist_depth)
+        summary["ring_stats"] = ring_stats
+        con = XM.open_db(db_path)
+        XM.write_marks(con, summary["mark_rows"])
+        XM.write_ring_week_stats(con, ring_stats)
+        con.close()
+        try:
+            import xianggate_lambda as XL
+            summary["lambda"] = {r: {"status": e["status"], "statement": e["statement"]}
+                                 for r, e in XL.run(out_dir, summary["week_key"], summary["asof"]).items()}
+        except ImportError:
+            con = XM.open_db(db_path)
+            summary["lambda"] = XM.read_lambda(con, summary["week_key"])
+            con.close()
+
     page = render_html(files, summary, history)
 
     # 覆寫最新首頁
@@ -777,6 +1248,10 @@ def main():
     print(f"  歷史週數  : {len(history)}")
     print(f"  首頁      : {index_path}")
     print(f"  封存      : {archive_path}")
+    if _MARK_OK and MARK_ENABLED:
+        print(f"  標記層    : mark_chain +{len(summary['mark_rows'])} 筆 → {db_path}")
+    else:
+        print(f"  標記層    : 停用（{'MARK_ENABLED=False' if _MARK_OK else '缺 xianggate_mark.py'}）")
     return 0
 
 if __name__ == "__main__":
