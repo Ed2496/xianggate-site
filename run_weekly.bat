@@ -1,21 +1,52 @@
 @echo off
 chcp 65001 >nul
-REM 相閘 週報更新(安全版)：週報→weekly.html，再合併→index.html（保留分頁框架）
-REM 2026-08-28 修正：不再直接覆蓋 index.html，改走 run_all 同路徑
-set SITE=C:\Users\ed249\Downloads\xianggate-site
-cd /d "%SITE%"
+setlocal enabledelayedexpansion
+REM ============================================================
+REM 相閘週報 · 每週五自動執行
+REM 觸發：Windows Task Scheduler（OpenClaw 已廢，不假設常駐服務）
+REM 動作：產報告(Cpk 寫檔) → git add/commit/push(Cpk 版本/上傳)
+REM ============================================================
 
-echo [1/3] 素材週報 -^> weekly.html ...
-python xianggate_weekly.py --mainfile weekly.html
-if errorlevel 1 (echo 週報失敗 & pause & exit /b 1)
+set "REPO=C:\Users\ed249\Downloads\xianggate-site"
+set "LOG=%REPO%\run_log.txt"
 
-echo [2/3] 整合儀表板 -^> index.html（週報+概念分頁） ...
-python xianggate_dashboard.py --out "%SITE%" --outfile index.html
-if errorlevel 1 (echo 儀表板合併失敗 & pause & exit /b 1)
+cd /d "%REPO%" 2>nul
+if errorlevel 1 (
+  echo [%date% %time%] [ERROR] repo 不存在: %REPO%
+  exit /b 1
+)
 
-echo [3/3] 推 GitHub ...
-git add -A
-git commit -m "xianggate weekly %date%"
-git push
-if errorlevel 1 (echo [!] push失敗,檢查 git remote -v & pause)
-echo 完成。週報已更新，index.html 分頁框架完整。
+echo ============================================== >> "%LOG%"
+echo [%date% %time%] 開始執行相閘週報 >> "%LOG%"
+
+REM 1) 產報告（掃描 → 環次命中 → HTML → history append）
+REM    --mainfile weekly.html 避免覆蓋儀表板首頁 index.html
+python "%REPO%\xianggate_weekly.py" --mainfile weekly.html >> "%LOG%" 2>&1
+if errorlevel 1 (
+  echo [%date% %time%] [ERROR] 產報告失敗，中止（未 push） >> "%LOG%"
+  exit /b 1
+)
+
+REM 1.5) 重建儀表板首頁（合併 weekly.html + concept_analysis.html → index.html）
+python "%REPO%\xianggate_dashboard.py" --out "%REPO%" --outfile index.html >> "%LOG%" 2>&1
+if errorlevel 1 (
+  echo [%date% %time%] [WARN] 儀表板合併失敗，weekly.html 已更新但 index.html 未刷新 >> "%LOG%"
+)
+
+REM 2) git 推送
+git add -A >> "%LOG%" 2>&1
+git diff --cached --quiet
+if errorlevel 1 (
+  git commit -m "相閘週報 %date%" >> "%LOG%" 2>&1
+  git push >> "%LOG%" 2>&1
+  if errorlevel 1 (
+    echo [%date% %time%] [ERROR] git push 失敗（檢查認證/網路） >> "%LOG%"
+    exit /b 1
+  )
+  echo [%date% %time%] 已 push 到 GitHub Pages >> "%LOG%"
+) else (
+  echo [%date% %time%] 無變更，跳過 commit/push >> "%LOG%"
+)
+
+echo [%date% %time%] 完成 >> "%LOG%"
+endlocal

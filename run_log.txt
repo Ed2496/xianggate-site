@@ -23,3 +23,23 @@ and then push using the remote name
 
 [é€±å›› 2026/08/20 16:05:25.65] pushed 
 [é€±å›› 2026/08/20 16:05:25.76] DONE 
+============================================== 
+[é€±ä¸‰ 2026/09/02 21:49:17.08] é–‹å§‹åŸ·è¡Œç›¸é–˜é€±å ± 
+[¬Û¹h¶g³ø] 2026-W36  as-of 2026-09-02T21:49:17  v1.6 (²Ö¥[§é½u+no-cache)
+  ¶×¤J¤é´Á°ò·Ç: modified¡]­×§ï¤é´Á¡^
+  ¤½¶}¦w¥þ¼Ò¦¡: ON(³vÀÉ©ú²ÓÁôÂÃ)
+  ±½´y¥Ø¿ý  : ['C:\\Users\\ed249\\Downloads\\TXT2026', 'C:\\Users\\ed249\\Downloads\\Transcripts-20260120']
+  ¯À§÷Á`¼Æ  : 2895¡]¥»¶g·s¼W 11¡^
+  ¦r¤¸Á`¶q  : 92,999,062¡]¥»¶g +29,223¡^
+  ¾ú¥v¶g¼Æ  : 40
+  ­º­¶      : C:\Users\ed249\Downloads\xianggate-site\weekly.html
+  «Ê¦s      : C:\Users\ed249\Downloads\xianggate-site\reports\2026-W36.html
+[»öªíªO] ²£¥X C:\Users\ed249\Downloads\xianggate-site\index.html
+Traceback (most recent call last):
+  File "C:\Users\ed249\Downloads\xianggate-site\xianggate_dashboard.py", line 192, in <module>
+    import sys; sys.exit(main())
+                         ^^^^^^
+  File "C:\Users\ed249\Downloads\xianggate-site\xianggate_dashboard.py", line 187, in main
+    print(f"  ¤À­¶ {label:<8} ¡ö {src}  {'\u2713 ¤w¤º´O' if ex else '\u2717 ©|¥¼²£¥Í'}")
+UnicodeEncodeError: 'cp950' codec can't encode character '\u2713' in position 29: illegal multibyte sequence
+[é€±ä¸‰ 2026/09/02 21:49:49.19] [WARN] å„€è¡¨æ¿åˆä½µå¤±æ•—ï¼Œweekly.html å·²æ›´æ–°ä½† index.html æœªåˆ·æ–° 

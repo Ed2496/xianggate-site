@@ -25,21 +25,7 @@ from datetime import datetime
 CSV_DIR=r"C:\Users\ed249\OneDrive\Documents"
 OUT_DIR=r"C:\Users\ed249\Downloads\xianggate-site"
 WEEKLY_PY="xianggate_weekly.py"
-VERSION="concept-v2.1"
-
-# 第二來源：Simplenote 匯出（你從 Windows 記事換到 Simplenote，2026-08-29 加）
-KEEP_CSV="keep_notes_review.csv"
-
-# 通用欄位偵測候選（Simplenote/Keep/其他 CSV 欄名不定，自動抓；抓錯用 SOURCE_OVERRIDES 釘死）
-TEXT_COL_CANDIDATES=["ConversationTopic","Content","content","Text","text","Note","note",
-    "Body","body","Note Content","NoteContent","內容","筆記","本文","memo","Memo"]
-DATE_COL_CANDIDATES=["MessageDeliveryTime","Created Date","CreatedDate","Created","created",
-    "Modified Date","ModifiedDate","Modified","modified","Updated","updated","Edited",
-    "Edited Date","Date","date","日期","建立時間","修改時間","createdate","modifydate","lastModified"]
-# 自動偵測抓錯時，用檔名關鍵字釘死欄位：{"檔名關鍵字":(text欄名或索引, date欄名或索引)}
-SOURCE_OVERRIDES={
-    # 例： "keep_notes_review": ("Content", "Modified Date"),
-}
+VERSION="concept-v2.0"
 
 # 寬靶：九大框架軸(涵蓋整個版圖)
 AXES={
@@ -89,45 +75,6 @@ def load_notes(path):
         d=r[dti] if len(r)>dti else "";m=re.search(r'(\d{4})[/-](\d{1,2})',d)
         out.append({"txt":t,"ym":f"{m.group(1)}-{int(m.group(2)):02d}" if m else None})
     return out
-
-def _pick_col(hdr, candidates, override=None):
-    """回傳欄位索引：override(欄名或索引)優先 → 候選欄名比對 → None。"""
-    if override is not None:
-        if isinstance(override, int): return override
-        if override in hdr: return hdr.index(override)
-    for c in candidates:
-        if c in hdr: return hdr.index(c)
-    return None
-
-def load_notes_any(path):
-    """通用載入器：表頭自動偵測 text/date 欄（Simplenote/Keep 等欄名不定）。
-    抓不到 text 欄 → 用內容平均最長的欄兜底。回傳 (notes, (text欄名, date欄名))。"""
-    raw=open(path,'rb').read().decode('utf-8','replace')
-    rows=list(csv.reader(io.StringIO(raw)))
-    if not rows: return [], ("空檔","無")
-    hdr=rows[0]; base=os.path.basename(path)
-    ov=None
-    for key,val in SOURCE_OVERRIDES.items():
-        if key in base: ov=val; break
-    ti=_pick_col(hdr, TEXT_COL_CANDIDATES, ov[0] if ov else None)
-    dti=_pick_col(hdr, DATE_COL_CANDIDATES, ov[1] if ov else None)
-    if ti is None:  # 兜底：選內容平均最長的欄當 text
-        lens=[0]*len(hdr)
-        for r in rows[1:300]:
-            for i,c in enumerate(r):
-                if i<len(lens): lens[i]+=len(c)
-        ti=lens.index(max(lens)) if any(lens) else 0
-    out=[]
-    for r in rows[1:]:
-        if len(r)<=ti: continue
-        t=r[ti].replace('\x01','').strip()
-        if len(t)<8: continue
-        d=r[dti] if (dti is not None and len(r)>dti) else ""
-        m=re.search(r'(\d{4})[/-](\d{1,2})',d)
-        out.append({"txt":t,"ym":f"{m.group(1)}-{int(m.group(2)):02d}" if m else None})
-    det=(hdr[ti] if ti is not None and ti<len(hdr) else f"idx{ti}",
-         hdr[dti] if (dti is not None and dti<len(hdr)) else "無")
-    return out, det
 
 def score(t,table):
     return {k:sum(1 for w in kws if w in t) for k,kws in table.items()}
@@ -276,36 +223,16 @@ def _write(out_dir,content):
 def main():
     import argparse,sys
     ap=argparse.ArgumentParser();ap.add_argument("--csv");ap.add_argument("--out");ap.add_argument("--dir");ap.add_argument("--weekly")
-    a=ap.parse_args();out_dir=a.out or OUT_DIR;scan_dir=a.dir or CSV_DIR
-    rings=load_ring_keywords(a.weekly or os.path.join(os.path.dirname(os.path.abspath(__file__)),WEEKLY_PY))
-    print(f"[歸位引擎] 相閘環 {len(rings)} 個當窄靶")
-
-    notes=[];srcs=[];dates=[]
+    a=ap.parse_args();out_dir=a.out or OUT_DIR
     if a.csv:
-        m=re.search(r'(\d{8})',os.path.basename(a.csv));d=m.group(1) if m else "?"
-        n,det=load_notes_any(a.csv)
-        notes+=n;srcs.append(os.path.basename(a.csv));dates.append(d)
-        print(f"[歸位引擎] 讀 {a.csv} (資料日 {d}) ｜ 便箋 {len(n)} 筆 ｜ 欄位偵測 text={det[0]} date={det[1]}")
+        path=a.csv;m=re.search(r'(\d{8})',os.path.basename(path));date=m.group(1) if m else "?"
     else:
-        # 來源一：最新 記事*.csv（舊 Windows 記事，可能已無）
-        path,date=find_latest_csv(scan_dir)
-        if path:
-            n=load_notes(path)
-            notes+=n;srcs.append(os.path.basename(path));dates.append(date)
-            print(f"[歸位引擎] 讀 {path} (資料日 {date}) ｜ 便箋 {len(n)} 筆 ｜ 來源：記事")
-        # 來源二：keep_notes_review.csv（Simplenote 匯出）
-        keep=os.path.join(scan_dir,KEEP_CSV)
-        if os.path.isfile(keep):
-            n,det=load_notes_any(keep)
-            kd=datetime.fromtimestamp(os.path.getmtime(keep)).strftime("%Y%m%d")
-            notes+=n;srcs.append(KEEP_CSV);dates.append(kd)
-            print(f"[歸位引擎] 讀 {keep} (檔期 {kd}) ｜ 便箋 {len(n)} 筆 ｜ 來源：Simplenote ｜ 欄位偵測 text={det[0]} date={det[1]}")
-        if not notes:
-            print(f"✗ 找不到 記事*.csv 或 {KEEP_CSV} 於 {scan_dir}");return 1
-
-    print(f"[歸位引擎] 合併便箋 {len(notes)} 筆（來源 {len(srcs)} 個：{', '.join(srcs)}）")
-    meta={"file":" + ".join(srcs) if srcs else "?","date":max(dates) if dates else "?"}
-    outp=render(notes,rings,meta,out_dir)
+        path,date=find_latest_csv(a.dir or CSV_DIR)
+        if not path: print(f"✗ 找不到 記事*.csv 於 {a.dir or CSV_DIR}");return 1
+    rings=load_ring_keywords(a.weekly or os.path.join(os.path.dirname(os.path.abspath(__file__)),WEEKLY_PY))
+    print(f"[歸位引擎] 讀 {path} (資料日 {date}) ｜ 相閘環 {len(rings)} 個當窄靶")
+    notes=load_notes(path);print(f"[歸位引擎] 結論便箋 {len(notes)} 筆")
+    outp=render(notes,rings,{"file":os.path.basename(path),"date":date},out_dir)
     print(f"[歸位引擎] 報告 → {outp}");return 0
 
 if __name__=="__main__": import sys;sys.exit(main())
