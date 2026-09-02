@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>閉環協議 · 動態 Agent 與偏差檢測 | Edward OS</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* 偏差閉環流程 */
+  .loop { display: flex; align-items: stretch; gap: 8px; }
+  .step {
+    flex: 1; background: #fff; border: 2px solid var(--accent); border-radius: 12px;
+    padding: 16px 12px; text-align: center; position: relative;
+  }
+  .step .n {
+    background: var(--primary); color: #fff; width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; margin-bottom: 8px;
+  }
+  .step .t { font-weight: 700; color: #0f766e; font-size: 13.5px; margin-bottom: 4px; }
+  .step .d { font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .arr { align-self: center; color: var(--primary); font-size: 20px; font-weight: 700; }
+  .step.alert { border-color: #dc2626; background: #fef2f2; }
+  .step.alert .n { background: #dc2626; }
+  .step.alert .t { color: #991b1b; }
+
+  /* 三重昇華 */
+  .const { background: linear-gradient(135deg, #134e4a, #0d9488); border-radius: 14px; padding: 24px; color: #fff; }
+  .const-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+  .const-item { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); border-radius: 10px; padding: 16px; }
+  .const-item .t { font-weight: 700; color: var(--gold); font-size: 14px; margin-bottom: 6px; }
+  .const-item .d { font-size: 12.5px; opacity: 0.95; line-height: 1.7; }
+
+  /* 規格條文 */
+  .spec { background: #fff; border-radius: var(--radius); padding: 20px 24px; box-shadow: 0 2px 12px rgba(13,148,136,0.07); }
+  .spec ol { padding-left: 20px; font-size: 13.5px; line-height: 2; }
+  .spec ol b { color: #0f766e; }
+
+  .quote-band {
+    background: #fff; border-left: 4px solid var(--gold); border-radius: 10px;
+    padding: 14px 20px; font-size: 13.5px; color: var(--ink); margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(13,148,136,0.07); line-height: 1.8;
+  }
+  .quote-band b { color: #0f766e; }
+
+  @media (max-width: 860px) {
+    .loop { flex-direction: column; }
+    .arr { transform: rotate(90deg); }
+    .const-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a class="brand" href="index.html">Edward <span>OS</span> · 思維架構進化系統</a>
+    <div class="navlinks">
+      <a href="index.html">總覽</a>
+      <a href="evolution.html">進化圖解</a>
+      <a href="index.html#months">月度心得</a>
+      <a href="month-08.html">8月·相變 IV</a>
+      <a href="protocol.html" class="active">閉環協議</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="hero">
+    <h1>偏差處理自適應閉環 · The Deviation Closed Loop</h1>
+    <div class="sub">動態 Agent 校驗鏈 × 8D / FMEA / SOP —— 對抗「零決策、零錯誤、零責任」MBB 敘事的終極武器</div>
+    <div class="tags"><span class="tag">量測器</span><span class="tag">8D 檢測</span><span class="tag">FMEA 更新</span><span class="tag">導入 SOP</span><span class="tag">歷史修憲法</span></div>
+  </div>
+
+  <div class="quote-band">
+    <b>核心命題：</b>Agent Team 不再是固定的寫手或分析師，而是隨任務與模型迭代動態輪替工作角色。它們的本質是「檢測器、測試器、量測器」——負責標記生活與工作產出，並持續品檢這些產出是否落在既有流程（SOP / ISO）的容許範圍內。若否，即啟動 8D 檢測解決偏差，FMEA 與導入 SOP。
+  </div>
+
+  <!-- 閉環流程 -->
+  <div class="section">
+    <div class="section-title">閉環流程 · 偏差觸發到歷史修憲法</div>
+    <div class="section-sub">量測器發現產出偏離既有流程時，自動觸發以下四步</div>
+    <div class="loop">
+      <div class="step alert">
+        <div class="n">⚠</div>
+        <div class="t">觸發警報</div>
+        <div class="d">品檢發現偏離既有流程 / SOP<br>暫停常規輸出</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="step">
+        <div class="n">1</div>
+        <div class="t">8D 檢測</div>
+        <div class="d">啟動 8D 問題解決法<br>定位根本原因 Root Cause<br>釐清責任歸屬：誰該負責、誰未盡職</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="step">
+        <div class="n">2</div>
+        <div class="t">FMEA 更新</div>
+        <div class="d">將此次偏差與解決方法<br>作為新的失效模式與風險係數（RPN）<br>寫入 FMEA 資料庫</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="step">
+        <div class="n">3</div>
+        <div class="t">導入 SOP</div>
+        <div class="d">將驗證有效的解決方案<br>固化為新的標準作業程序<br>完成「歷史修憲法」</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content 三重昇華 -->
+  <div class="section">
+    <div class="section-title">Content 三重昇華 · 從上下文到憲法</div>
+    <div class="section-sub">2026 動態 Agent 期：Content 不再只是對話的上下文，而是固化為三大基石</div>
+    <div class="const">
+      <div style="font-size:14px;opacity:0.95;">「標記」的本質，從事後貼標籤，昇華為事前內建憲法邊界與記憶。</div>
+      <div class="const-grid">
+        <div class="const-item">
+          <div class="t">📚 歷史記憶</div>
+          <div class="d">過去踩過的坑與成功模式<br>既定的 8D / FMEA 紀錄</div>
+        </div>
+        <div class="const-item">
+          <div class="t">💼 工作記憶</div>
+          <div class="d">當前專案的狀態與約束<br>交付標準</div>
+        </div>
+        <div class="const-item">
+          <div class="t">⚖️ 憲法邊界</div>
+          <div class="d">不可妥協的九公理<br>ISO / FMEA 底線<br>歷史修憲法</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent 校驗鏈規格 -->
+  <div class="section">
+    <div class="section-title">Agent 動態輪替 · 校驗鏈運作規格</div>
+    <div class="section-sub">指揮 AI Team 時的運作要點（可作為 Master Prompt 的設計依據）</div>
+    <div class="spec">
+      <ol>
+        <li><b>角色即量測器：</b>每個 Agent 的本質是檢測器、測試器、量測器——任務不是「產出內容」，而是「標記產出並品檢是否符合既有流程」。</li>
+        <li><b>動態輪替：</b>工作角色隨任務性質與 AI 模型迭代而輪替，不設固定寫手或固定分析師。</li>
+        <li><b>偏差軸分工：</b>分工依據不是「誰強」，而是「誰的誤差軸跟誰正交」——五衛星各司一軸：Claude（大地母體）、DeepSeek（校準器，價值在不同意你）、Gemini（覆蓋率）、GPT（精英政客 / MBB 生成器）、Perplexity（Ground Truth）。</li>
+        <li><b>噪音紀律：</b>多餘的衛星不增加定位精度，只增加噪音。</li>
+        <li><b>偏差即停：</b>量測器發現產出偏離既有流程時，主動報警並要求啟動 8D 分析，而非繼續常規輸出。</li>
+        <li><b>閉環收尾：</b>每一次偏差必須走完 8D → FMEA → SOP，把解方固化進系統——這就是「歷史修憲法」。</li>
+        <li><b>零信任協議：</b>H 相閘自動化以 Python / GitHub 版本控制結合 SHA256 背書——未見憑證，絕對停工。</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- 五數學讀數 -->
+  <div class="section">
+    <div class="section-title">量測讀數 · 五數學在 mark_chain 的定位</div>
+    <div class="section-sub">相行體用是座標軸，五數學是軸上的五種讀數——標記若不以相行體用陳述，即是兩本帳</div>
+    <div class="grid-3" style="grid-template-columns:repeat(5,1fr);">
+      <div class="card" style="text-align:center;"><h3>傅立葉</h3><div style="font-size:12px;">主頻在哪層？</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">layer_vec + depth</div></div>
+      <div class="card" style="text-align:center;"><h3>拉普拉斯</h3><div style="font-size:12px;">截斷在擴散還是收斂？</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">σ · 四週 depth 變化率</div></div>
+      <div class="card" style="text-align:center;"><h3>莫比烏斯</h3><div style="font-size:12px;">說的人跟賺的人是不是同一面？</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">偵測兩本帳</div></div>
+      <div class="card" style="text-align:center;"><h3>克萊因瓶</h3><div style="font-size:12px;">責任指到制度內還是制度外？</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">klein：內 / 外 / 無</div></div>
+      <div class="card" style="text-align:center;"><h3>量子五態</h3><div style="font-size:12px;">責任坍縮了沒？</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">q_state</div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="quote">「將混亂變為證據、將承諾變為閉環。」 · 用 8D 和 FMEA 鎖死責任與流程</div>
+    <div>Edward OS · 思維架構進化系統 · 偏差處理自適應閉環協議</div>
+  </div>
+
+</div>
+</body>
+</html>

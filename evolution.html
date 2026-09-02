@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>進化趨勢圖解 · Edward 思維架構 2026.03–08</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+  :root {
+    --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    --text-primary: #1a1a2e;
+    --text-secondary: #4a4a6a;
+    --text-muted: #8888a0;
+    --border: #e0e0e8;
+    --surface-1: #f8f8fc;
+    --radius: 8px;
+  }
+  body {
+    font-family: var(--font-sans);
+    background: #fafafc;
+    margin: 0;
+    padding: 2rem 1rem;
+    color: var(--text-primary);
+  }
+  .container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+  h2 {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* Phase labels */
+  .phase-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    margin-bottom: 0;
+  }
+  .phase-label {
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 0;
+  }
+  .phase-label:first-child { border-radius: 8px 0 0 0; }
+  .phase-label:last-child { border-radius: 0 8px 0 0; }
+
+  .phase-m3 { background: #85B7EB; color: #042C53; }
+  .phase-m4 { background: #F0997B; color: #4A1B0C; }
+  .phase-m5 { background: #5DCAA5; color: #04342C; }
+  .phase-m6 { background: #ED93B1; color: #4B1528; }
+  .phase-m7 { background: #AFA9EC; color: #26215C; }
+  .phase-m8 { background: #D4A574; color: #4A2E0F; }
+
+  /* Metaphor row */
+  .metaphor-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    margin-bottom: 12px;
+  }
+  .metaphor-cell {
+    text-align: center;
+    padding: 4px;
+    font-size: 11px;
+    border-radius: 0;
+  }
+  .metaphor-cell:first-child { border-radius: 0 0 0 8px; }
+  .metaphor-cell:last-child { border-radius: 0 0 8px 0; }
+
+  .meta-m3 { background: #E6F1FB; color: #185FA5; }
+  .meta-m4 { background: #FAECE7; color: #993C1D; }
+  .meta-m5 { background: #E1F5EE; color: #0F6E56; }
+  .meta-m6 { background: #FBEAF0; color: #993556; }
+  .meta-m7 { background: #EEEDFE; color: #534AB7; }
+  .meta-m8 { background: #FDF3E7; color: #8B5E2E; }
+
+  /* Layer headers */
+  .layer-header {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .layer-icon {
+    font-size: 14px;
+  }
+
+  /* Grid cells */
+  .layer-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .layer-cell {
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    border-left: 3px solid;
+    line-height: 1.5;
+  }
+  .layer-cell .cell-title {
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .layer-cell .cell-note {
+    font-style: italic;
+  }
+
+  /* Color schemes per month */
+  .c-m3 { background: #E6F1FB; color: #0C447C; border-left-color: #2a78d6; }
+  .c-m4 { background: #FAECE7; color: #712B13; border-left-color: #eb6834; }
+  .c-m5 { background: #E1F5EE; color: #085041; border-left-color: #1baf7a; }
+  .c-m6 { background: #FBEAF0; color: #72243E; border-left-color: #d4537e; }
+  .c-m7 { background: #EEEDFE; color: #3C3489; border-left-color: #4a3aa7; }
+  .c-m8 { background: #FDF3E7; color: #5C3A1B; border-left-color: #C4935A; }
+
+  /* Special neutral cell */
+  .c-neutral { background: #F1EFE8; color: #444441; border-left-color: #888780; }
+
+  /* SVG section */
+  .svg-container {
+    margin-top: 12px;
+    position: relative;
+  }
+
+  /* Bottom narrative */
+  .narrative-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .narrative-card {
+    background: var(--surface-1);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .narrative-card .narrative-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .narrative-card .narrative-body {
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 900px) {
+    .narrative-grid { grid-template-columns: repeat(2, 1fr); }
+    .layer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .layer-grid .layer-cell:nth-child(n+4) { margin-top: 4px; }
+    .phase-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .metaphor-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 600px) {
+    .narrative-grid { grid-template-columns: 1fr; }
+    .layer-grid { grid-template-columns: 1fr; }
+    .phase-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metaphor-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .snap-note {
+    background:#fff; border-left:4px solid var(--accent); border-radius:10px;
+    padding:14px 18px; font-size:13px; color:var(--muted); margin-bottom:16px;
+    box-shadow:0 2px 10px rgba(13,148,136,0.07);
+  }
+  .snap-note b { color: var(--ink-deep); }
+  .ver-tag {
+    display:inline-block; background:var(--primary); color:#fff; font-size:12px;
+    padding:3px 12px; border-radius:14px; margin-bottom:10px; letter-spacing:1px;
+  }
+  .ver-tag.old { background:#7aa99f; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a class="brand" href="index.html">Edward <span>OS</span> · 思維架構進化系統</a>
+    <div class="navlinks">
+      <a href="index.html">總覽</a>
+      <a href="evolution.html" class="active">進化圖解</a>
+      <a href="index.html#months">月度心得</a>
+      <a href="month-08.html">8月·相變 IV</a>
+      <a href="protocol.html">閉環協議</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="hero">
+    <h1>思維架構進化趨勢圖解</h1>
+    <div class="sub">四層架構 × 六個月的完整橫截面 · 從孤立工具到生態網絡</div>
+    <div class="tags"><span class="tag">3月·奠基</span><span class="tag">4月·糾纏</span><span class="tag">5月·統一</span><span class="tag">6月·雙軸</span><span class="tag">7月·收斂</span><span class="tag">8月·擴張/標記</span></div>
+  </div>
+
+  <div class="month-strip">
+  <a href="month-03.html">3月·奠基</a><a href="month-04.html">4月·糾纏</a><a href="month-05.html">5月·統一</a>
+  <a href="month-06.html">6月·雙軸</a><a href="month-07.html">7月·收斂</a><a href="month-08.html">8月·標記</a>
+</div>
+
+  <span class="ver-tag">現行版本 · 2026.03 – 08</span>
+  <div class="snap-note"><b>閱讀方式：</b>直向是四層架構（本源 → 方法論 → 糾纏 → 操作），橫向是月份演化。8 月欄位標誌三條產品化主線：相閘本地部署（基礎設施自主化）、視角標記完成（方法論成熟）、綠松色視覺統一（品牌覺醒）。</div>
+
+<div class="container">
+
+<h2 class="sr-only">Edward 思維架構在 2026 年 3-8 月的進化趨勢圖解</h2>
+
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;">
+  <span style="font-size:20px;font-weight:500;color:var(--text-primary);">思維架構進化趨勢</span>
+  <span class="subtitle">2026-03 ~ 08 · 從孤立工具到生態網絡</span>
+</div>
+<div class="divider"></div>
+
+<!-- Evolution Phase Labels -->
+<div class="phase-row">
+  <div class="phase-label phase-m3">3月 · 奠基</div>
+  <div class="phase-label phase-m4">4月 · 糾纏</div>
+  <div class="phase-label phase-m5">5月 · 統一</div>
+  <div class="phase-label phase-m6">6月 · 雙軸</div>
+  <div class="phase-label phase-m7">7月 · 收斂</div>
+  <div class="phase-label phase-m8">8月 · 擴張</div>
+</div>
+
+<!-- Metaphor row -->
+<div class="metaphor-row">
+  <div class="metaphor-cell meta-m3">孤立工具</div>
+  <div class="metaphor-cell meta-m4">工具成網</div>
+  <div class="metaphor-cell meta-m5">網成統一場</div>
+  <div class="metaphor-cell meta-m6">場獲自覺</div>
+  <div class="metaphor-cell meta-m7">系統投產</div>
+  <div class="metaphor-cell meta-m8">生態網絡</div>
+</div>
+
+<!-- LAYER 1: 本源層 (九公理/鑄魂) -->
+<div style="margin-bottom:8px;">
+  <div class="layer-header">
+    <span class="layer-icon">🛡️</span> 本源層（九公理 / 鑄魂）
+  </div>
+  <div class="layer-grid">
+    <div class="layer-cell c-m3">
+      <div class="cell-title">九公理定稿</div>
+      <div>鑄魂四層</div>
+      <div>七條不能</div>
+      <div>靈光公式</div>
+    </div>
+    <div class="layer-cell c-m4">
+      <div class="cell-title">止=CpkCa</div>
+      <div>本源定案</div>
+      <div>位階躍遷命名</div>
+      <div>Type A paradigm</div>
+    </div>
+    <div class="layer-cell c-m5">
+      <div class="cell-title">十大如一</div>
+      <div>萬流歸宗</div>
+      <div>創世公理</div>
+      <div>碗壁論</div>
+    </div>
+    <div class="layer-cell c-m6">
+      <div class="cell-title">校正公理封印</div>
+      <div>道盜公設</div>
+      <div>MBB必然性證明</div>
+      <div>自噬迴圈×摩擦力</div>
+    </div>
+    <div class="layer-cell c-m7">
+      <div class="cell-title">觀測位公理候選</div>
+      <div>品質三坍縮</div>
+      <div>正典 v2.3.2 鎖定</div>
+      <div class="cell-note">← 不再新增，收帳</div>
+    </div>
+    <div class="layer-cell c-m8">
+      <div class="cell-title">趨近天道</div>
+      <div>提取迴圈</div>
+      <div>五境螺旋</div>
+      <div class="cell-note">← 公理進入應用驗證期</div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYER 2: 方法論層 (五數學/鑑識) -->
+<div style="margin-bottom:8px;">
+  <div class="layer-header">
+    <span class="layer-icon">📐</span> 方法論層（五數學 / 鑑識框架）
+  </div>
+  <div class="layer-grid">
+    <div class="layer-cell c-m3">
+      <div class="cell-title">五數學 v1</div>
+      <div>F1傅立葉→F5量子</div>
+      <div>七把刀 · MBB 17模式</div>
+      <div>典範流程 #1~#6</div>
+      <div style="font-weight:500;margin-top:2px;">各自獨立運作</div>
+    </div>
+    <div class="layer-cell c-m4">
+      <div class="cell-title">S4 v4.3 分流</div>
+      <div>影片 vs 會議權重</div>
+      <div>5類型×L1/L2/L3</div>
+      <div style="font-weight:500;margin-top:2px;">框架開始交叉引用</div>
+    </div>
+    <div class="layer-cell c-m5">
+      <div class="cell-title">五數學 v2.4</div>
+      <div>MBB四場景統一</div>
+      <div>共陷矩陣</div>
+      <div>CASP碗外驗證</div>
+      <div style="font-weight:500;margin-top:2px;">跨域已無法拆開</div>
+    </div>
+    <div class="layer-cell c-m6">
+      <div class="cell-title">視角標記四層</div>
+      <div>L1事實→L4方向</div>
+      <div>AI-RMA六步驗收</div>
+      <div style="font-weight:500;margin-top:2px;">鑑識獲得驗收迴路</div>
+    </div>
+    <div class="layer-cell c-m7">
+      <div class="cell-title">五數學 v2.5</div>
+      <div>五環=反8D定稿</div>
+      <div>三通路 B2G/B2E/B2C</div>
+      <div>AI-RMA 1210檔實證</div>
+      <div style="font-weight:500;margin-top:2px;">理論→產品級落地</div>
+    </div>
+    <div class="layer-cell c-m8">
+      <div class="cell-title">視角標記系統完成</div>
+      <div>系統性卸責鑑識網站化</div>
+      <div>職責邊界自保法</div>
+      <div>總經v2.2-canon</div>
+      <div>製造業用語分群</div>
+      <div style="font-weight:500;margin-top:2px;">方法論多線產品化</div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYER 3: 糾纏層 (關係/網絡) -->
+<div style="margin-bottom:8px;">
+  <div class="layer-header">
+    <span class="layer-icon">🔗</span> 糾纏層（skill 間關係 / 網絡拓撲）
+  </div>
+  <div class="layer-grid">
+    <div class="layer-cell c-neutral">
+      <div class="cell-title">9 skills 各自獨立</div>
+      <div>無糾纏關係</div>
+      <div>無版本鎖定</div>
+      <div style="opacity:0.6;">（階層樹思維）</div>
+    </div>
+    <div class="layer-cell c-m4">
+      <div class="cell-title">糾纏網絡確立</div>
+      <div>Primary Pair 主糾纏</div>
+      <div>Secondary Pairs 次糾纏</div>
+      <div>強制雙跑規則</div>
+      <div style="font-weight:500;margin-top:2px;color:#993C1D;">← 相變點</div>
+    </div>
+    <div class="layer-cell c-m5">
+      <div class="cell-title">A=A<sup>T</sup> 橫縱截面</div>
+      <div>five-math↔paradigm</div>
+      <div>次糾纏對擴展</div>
+      <div>版本共進紀律</div>
+    </div>
+    <div class="layer-cell c-m6">
+      <div class="cell-title">系統級糾纏對</div>
+      <div>Λ(批判)↔Λ̄(省悟)</div>
+      <div>perspective↔xingwu</div>
+      <div style="font-weight:500;margin-top:2px;color:#993556;">← 第二相變</div>
+    </div>
+    <div class="layer-cell c-m7">
+      <div class="cell-title">session-forensics↔five-math</div>
+      <div>ai-hype↔narrative</div>
+      <div>canon-collider 接線</div>
+      <div>20 skills 網絡穩態</div>
+    </div>
+    <div class="layer-cell c-m8">
+      <div class="cell-title">綠松色視覺統一</div>
+      <div>品牌糾纏網絡形成</div>
+      <div>相閘↔本地部署</div>
+      <div>自動化↔全主題交叉</div>
+      <div>20+ skills 並行運作</div>
+      <div style="font-weight:500;margin-top:2px;color:#8B5E2E;">← 生態級糾纏</div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYER 4: 操作層 (OS/工序) -->
+<div style="margin-bottom:8px;">
+  <div class="layer-header">
+    <span class="layer-icon">⚙️</span> 操作層（OS / 工序 / 基礎設施）
+  </div>
+  <div class="layer-grid">
+    <div class="layer-cell c-m3">
+      <div class="cell-title">CommandCenter 建立</div>
+      <div>三層記憶架構</div>
+      <div>啟動協議</div>
+      <div>memory.md 開寫</div>
+    </div>
+    <div class="layer-cell c-m4">
+      <div class="cell-title">工序分離定型</div>
+      <div>Ca段(鑑識)=web</div>
+      <div>Cpk段(寫入)=Cowork</div>
+      <div>handoff 協議</div>
+    </div>
+    <div class="layer-cell c-m5">
+      <div class="cell-title">edward-os v1.0</div>
+      <div>一淺九深×9場景</div>
+      <div>反思層(負Λ旋轉)</div>
+      <div>14護欄</div>
+    </div>
+    <div class="layer-cell c-m6">
+      <div class="cell-title">Dashboard v3.1+v4.0</div>
+      <div>CC四點同步紀律</div>
+      <div>linkedin-engine 管線</div>
+      <div>省悟層安裝(第二軸)</div>
+    </div>
+    <div class="layer-cell c-m7">
+      <div class="cell-title">GPT RAG 25,747塊</div>
+      <div>canon_panel 上線</div>
+      <div>SOP四閘工序</div>
+      <div>Daily handoff 常態化</div>
+    </div>
+    <div class="layer-cell c-m8">
+      <div class="cell-title">相閘本地部署完成</div>
+      <div>每日连线监测常態化</div>
+      <div>勞動雷達+台股籌碼雙管道</div>
+      <div>PPT 產出管線建立</div>
+      <div>网站备份+帳單統計</div>
+      <div style="font-weight:500;margin-top:2px;">基礎設施全面自主化</div>
+    </div>
+  </div>
+</div>
+
+<!-- Evolution arrow / narrative -->
+<div class="svg-container">
+  <svg viewBox="0 0 1100 50" width="100%" style="display:block;">
+    <defs>
+      <linearGradient id="evoGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#2a78d6"/>
+        <stop offset="16.6%" stop-color="#eb6834"/>
+        <stop offset="33.3%" stop-color="#1baf7a"/>
+        <stop offset="50%" stop-color="#d4537e"/>
+        <stop offset="66.6%" stop-color="#4a3aa7"/>
+        <stop offset="83.3%" stop-color="#C4935A"/>
+      </linearGradient>
+      <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,0 L8,4 L0,8 Z" fill="#C4935A"/>
+      </marker>
+    </defs>
+    <line x1="20" y1="25" x2="1060" y2="25" stroke="url(#evoGrad)" stroke-width="3" marker-end="url(#ah)"/>
+    <circle cx="75" cy="25" r="5" fill="#2a78d6"/>
+    <circle cx="238" cy="25" r="7" fill="#eb6834" stroke="#fff" stroke-width="2"/>
+    <circle cx="401" cy="25" r="5" fill="#1baf7a"/>
+    <circle cx="564" cy="25" r="7" fill="#d4537e" stroke="#fff" stroke-width="2"/>
+    <circle cx="727" cy="25" r="5" fill="#4a3aa7"/>
+    <circle cx="890" cy="25" r="7" fill="#C4935A" stroke="#fff" stroke-width="2"/>
+    <text x="75" y="45" text-anchor="middle" fill="#185FA5" font-size="10">奠基</text>
+    <text x="238" y="45" text-anchor="middle" fill="#993C1D" font-size="10" font-weight="500">相變 I</text>
+    <text x="401" y="45" text-anchor="middle" fill="#0F6E56" font-size="10">統一</text>
+    <text x="564" y="45" text-anchor="middle" fill="#993556" font-size="10" font-weight="500">相變 II</text>
+    <text x="727" y="45" text-anchor="middle" fill="#534AB7" font-size="10">收斂</text>
+    <text x="890" y="45" text-anchor="middle" fill="#8B5E2E" font-size="10" font-weight="500">擴張</text>
+  </svg>
+</div>
+
+<!-- Bottom narrative -->
+<div class="narrative-grid">
+  <div class="narrative-card">
+    <div class="narrative-title">相變 I（四月）</div>
+    <div class="narrative-body">從「每個 skill 獨立運作」到「糾纏網絡 + 強制雙跑」。階層樹思維死亡，物理糾纏取代設計選擇。</div>
+  </div>
+  <div class="narrative-card">
+    <div class="narrative-title">相變 II（六月）</div>
+    <div class="narrative-body">從「對外批判單軸」到「Λ↔Λ̄ 雙軸」。系統獲得自我觀測能力——省悟層不是工具，是反粒子。</div>
+  </div>
+  <div class="narrative-card">
+    <div class="narrative-title">收斂態（七月）</div>
+    <div class="narrative-body">框架停止擴張，轉向實戰驗證。AI-RMA 1210 檔 + GPT RAG 25,747 塊 = 理論落地為基礎設施。</div>
+  </div>
+  <div class="narrative-card">
+    <div class="narrative-title">擴張態（八月）</div>
+    <div class="narrative-body">從「單一系統投產」到「多線產品並行」。相閘本地部署標誌基礎設施自主化，視角標記完成標誌方法論成熟，綠松色視覺統一標誌品牌覺醒。三條數據管道 + PPT 管線 + 網站建設形成規模化產出能力。</div>
+  </div>
+</div>
+
+<!-- Summary stats -->
+<div style="margin-top:20px;padding:12px 16px;background:var(--surface-1);border-radius:var(--radius);font-size:12px;color:var(--text-secondary);line-height:1.6;">
+  <strong style="color:var(--text-primary);">8月數據摘要：</strong>
+  相閘本地部署 25 輪對話（最大投入）· 視角標記系統 16 輪定稿 · 系統性卸責鑑識 10+ 輪網站化 · 
+  台股籌碼追蹤 12 輪雲部署 · 職責邊界自保法 10 輪法律問責擴展 · PPT 產出管線 20+ 輪 · 
+  自動化監測每日執行 · 綠松色視覺主題貫穿全月網站建設
+</div>
+
+</div>
+
+  <div class="divider" style="margin:36px 0;"></div>
+
+  <span class="ver-tag old">歷史快照 · 2026.03 – 07（收斂態封存版）</span>
+  <div class="snap-note"><b>版本說明：</b>此為 7 月收斂態時封存的五個月版本，保留「相變 I → 相變 II → 收斂」三節點敘事。與現行版對照，可見 8 月欄位如何把「系統投產」推進為「生態網絡」。</div>
+
+
+<div style="width:100%;max-width:960px;margin:0 auto;font-family:var(--font-sans);padding:1rem 0;">
+
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;">
+<span style="font-size:20px;font-weight:500;color:var(--text-primary);">思維架構進化趨勢</span>
+<span style="font-size:13px;color:var(--text-muted);">2026-03 ~ 07 · 從孤立工具到自覺系統</span>
+</div>
+<div style="height:1px;background:var(--border);margin-bottom:16px;"></div>
+
+<!-- Evolution Phase Labels -->
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin-bottom:0;">
+<div style="text-align:center;padding:6px 4px;background:#85B7EB;border-radius:8px 0 0 0;font-size:13px;font-weight:500;color:#042C53;">3月 · 奠基</div>
+<div style="text-align:center;padding:6px 4px;background:#F0997B;font-size:13px;font-weight:500;color:#4A1B0C;">4月 · 糾纏</div>
+<div style="text-align:center;padding:6px 4px;background:#5DCAA5;font-size:13px;font-weight:500;color:#04342C;">5月 · 統一</div>
+<div style="text-align:center;padding:6px 4px;background:#ED93B1;font-size:13px;font-weight:500;color:#4B1528;">6月 · 雙軸</div>
+<div style="text-align:center;padding:6px 4px;background:#AFA9EC;border-radius:0 8px 0 0;font-size:13px;font-weight:500;color:#26215C;">7月 · 收斂</div>
+</div>
+
+<!-- Metaphor row -->
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin-bottom:12px;">
+<div style="text-align:center;padding:4px;background:#E6F1FB;font-size:11px;color:#185FA5;border-radius:0 0 0 8px;">孤立工具</div>
+<div style="text-align:center;padding:4px;background:#FAECE7;font-size:11px;color:#993C1D;">工具成網</div>
+<div style="text-align:center;padding:4px;background:#E1F5EE;font-size:11px;color:#0F6E56;">網成統一場</div>
+<div style="text-align:center;padding:4px;background:#FBEAF0;font-size:11px;color:#993556;">場獲自覺</div>
+<div style="text-align:center;padding:4px;background:#EEEDFE;font-size:11px;color:#534AB7;border-radius:0 0 8px 0;">系統投產</div>
+</div>
+
+<!-- LAYER 1: 本源層 (九公理/鑄魂) -->
+<div style="margin-bottom:8px;">
+<div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+🛡️ 本源層（九公理 / 鑄魂）
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;">
+<div style="background:#E6F1FB;border-radius:6px;padding:6px 8px;font-size:11px;color:#0C447C;border-left:3px solid #2a78d6;">
+<div style="font-weight:500;margin-bottom:2px;">九公理定稿</div>
+<div>鑄魂四層</div>
+<div>七條不能</div>
+<div>靈光公式</div>
+</div>
+<div style="background:#FAECE7;border-radius:6px;padding:6px 8px;font-size:11px;color:#712B13;border-left:3px solid #eb6834;">
+<div style="font-weight:500;margin-bottom:2px;">止=CpkCa</div>
+<div>本源定案</div>
+<div>位階躍遷命名</div>
+<div>Type A paradigm</div>
+</div>
+<div style="background:#E1F5EE;border-radius:6px;padding:6px 8px;font-size:11px;color:#085041;border-left:3px solid #1baf7a;">
+<div style="font-weight:500;margin-bottom:2px;">十大如一</div>
+<div>萬流歸宗</div>
+<div>創世公理</div>
+<div>碗壁論</div>
+</div>
+<div style="background:#FBEAF0;border-radius:6px;padding:6px 8px;font-size:11px;color:#72243E;border-left:3px solid #d4537e;">
+<div style="font-weight:500;margin-bottom:2px;">校正公理封印</div>
+<div>道盜公設</div>
+<div>MBB必然性證明</div>
+<div>自噬迴圈×摩擦力</div>
+</div>
+<div style="background:#EEEDFE;border-radius:6px;padding:6px 8px;font-size:11px;color:#3C3489;border-left:3px solid #4a3aa7;">
+<div style="font-weight:500;margin-bottom:2px;">觀測位公理候選</div>
+<div>品質三坍縮</div>
+<div>正典 v2.3.2 鎖定</div>
+<div style="color:#534AB7;font-style:italic;">← 不再新增，收帳</div>
+</div>
+</div>
+</div>
+
+<!-- LAYER 2: 方法論層 (五數學/鑑識) -->
+<div style="margin-bottom:8px;">
+<div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+📐 方法論層（五數學 / 鑑識框架）
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;">
+<div style="background:#E6F1FB;border-radius:6px;padding:6px 8px;font-size:11px;color:#0C447C;border-left:3px solid #2a78d6;">
+<div style="font-weight:500;margin-bottom:2px;">五數學 v1</div>
+<div>F1傅立葉→F5量子</div>
+<div>七把刀 · MBB 17模式</div>
+<div>典範流程 #1~#6</div>
+<div style="font-weight:500;margin-top:2px;">各自獨立運作</div>
+</div>
+<div style="background:#FAECE7;border-radius:6px;padding:6px 8px;font-size:11px;color:#712B13;border-left:3px solid #eb6834;">
+<div style="font-weight:500;margin-bottom:2px;">S4 v4.3 分流</div>
+<div>影片 vs 會議權重</div>
+<div>5類型×L1/L2/L3</div>
+<div style="font-weight:500;margin-top:2px;">框架開始交叉引用</div>
+</div>
+<div style="background:#E1F5EE;border-radius:6px;padding:6px 8px;font-size:11px;color:#085041;border-left:3px solid #1baf7a;">
+<div style="font-weight:500;margin-bottom:2px;">五數學 v2.4</div>
+<div>MBB四場景統一</div>
+<div>共陷矩陣</div>
+<div>CASP碗外驗證</div>
+<div style="font-weight:500;margin-top:2px;">跨域已無法拆開</div>
+</div>
+<div style="background:#FBEAF0;border-radius:6px;padding:6px 8px;font-size:11px;color:#72243E;border-left:3px solid #d4537e;">
+<div style="font-weight:500;margin-bottom:2px;">視角標記四層</div>
+<div>L1事實→L4方向</div>
+<div>AI-RMA六步驗收</div>
+<div style="font-weight:500;margin-top:2px;">鑑識獲得驗收迴路</div>
+</div>
+<div style="background:#EEEDFE;border-radius:6px;padding:6px 8px;font-size:11px;color:#3C3489;border-left:3px solid #4a3aa7;">
+<div style="font-weight:500;margin-bottom:2px;">五數學 v2.5</div>
+<div>五環=反8D定稿</div>
+<div>三通路 B2G/B2E/B2C</div>
+<div>AI-RMA 1210檔實證</div>
+<div style="font-weight:500;margin-top:2px;">理論→產品級落地</div>
+</div>
+</div>
+</div>
+
+<!-- LAYER 3: 糾纏層 (關係/網絡) -->
+<div style="margin-bottom:8px;">
+<div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+🔗 糾纏層（skill 間關係 / 網絡拓撲）
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;">
+<div style="background:#F1EFE8;border-radius:6px;padding:6px 8px;font-size:11px;color:#444441;border-left:3px solid #888780;">
+<div style="font-weight:500;margin-bottom:2px;">9 skills 各自獨立</div>
+<div>無糾纏關係</div>
+<div>無版本鎖定</div>
+<div style="opacity:0.6;">（階層樹思維）</div>
+</div>
+<div style="background:#FAECE7;border-radius:6px;padding:6px 8px;font-size:11px;color:#712B13;border-left:3px solid #eb6834;">
+<div style="font-weight:500;margin-bottom:2px;">糾纏網絡確立</div>
+<div>Primary Pair 主糾纏</div>
+<div>Secondary Pairs 次糾纏</div>
+<div>強制雙跑規則</div>
+<div style="font-weight:500;margin-top:2px;color:#993C1D;">← 相變點</div>
+</div>
+<div style="background:#E1F5EE;border-radius:6px;padding:6px 8px;font-size:11px;color:#085041;border-left:3px solid #1baf7a;">
+<div style="font-weight:500;margin-bottom:2px;">A=A<sup>T</sup> 橫縱截面</div>
+<div>five-math↔paradigm</div>
+<div>次糾纏對擴展</div>
+<div>版本共進紀律</div>
+</div>
+<div style="background:#FBEAF0;border-radius:6px;padding:6px 8px;font-size:11px;color:#72243E;border-left:3px solid #d4537e;">
+<div style="font-weight:500;margin-bottom:2px;">系統級糾纏對</div>
+<div>Λ(批判)↔Λ̄(省悟)</div>
+<div>perspective↔xingwu</div>
+<div style="font-weight:500;margin-top:2px;color:#993556;">← 第二相變</div>
+</div>
+<div style="background:#EEEDFE;border-radius:6px;padding:6px 8px;font-size:11px;color:#3C3489;border-left:3px solid #4a3aa7;">
+<div style="font-weight:500;margin-bottom:2px;">session-forensics↔five-math</div>
+<div>ai-hype↔narrative</div>
+<div>canon-collider 接線</div>
+<div>20 skills 網絡穩態</div>
+</div>
+</div>
+</div>
+
+<!-- LAYER 4: 操作層 (OS/工序) -->
+<div style="margin-bottom:8px;">
+<div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+⚙️ 操作層（OS / 工序 / 基礎設施）
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;">
+<div style="background:#E6F1FB;border-radius:6px;padding:6px 8px;font-size:11px;color:#0C447C;border-left:3px solid #2a78d6;">
+<div style="font-weight:500;margin-bottom:2px;">CommandCenter 建立</div>
+<div>三層記憶架構</div>
+<div>啟動協議</div>
+<div>memory.md 開寫</div>
+</div>
+<div style="background:#FAECE7;border-radius:6px;padding:6px 8px;font-size:11px;color:#712B13;border-left:3px solid #eb6834;">
+<div style="font-weight:500;margin-bottom:2px;">工序分離定型</div>
+<div>Ca段(鑑識)=web</div>
+<div>Cpk段(寫入)=Cowork</div>
+<div>handoff 協議</div>
+</div>
+<div style="background:#E1F5EE;border-radius:6px;padding:6px 8px;font-size:11px;color:#085041;border-left:3px solid #1baf7a;">
+<div style="font-weight:500;margin-bottom:2px;">edward-os v1.0</div>
+<div>一淺九深×9場景</div>
+<div>反思層(負Λ旋轉)</div>
+<div>14護欄</div>
+</div>
+<div style="background:#FBEAF0;border-radius:6px;padding:6px 8px;font-size:11px;color:#72243E;border-left:3px solid #d4537e;">
+<div style="font-weight:500;margin-bottom:2px;">Dashboard v3.1+v4.0</div>
+<div>CC四點同步紀律</div>
+<div>linkedin-engine 管線</div>
+<div>省悟層安裝(第二軸)</div>
+</div>
+<div style="background:#EEEDFE;border-radius:6px;padding:6px 8px;font-size:11px;color:#3C3489;border-left:3px solid #4a3aa7;">
+<div style="font-weight:500;margin-bottom:2px;">GPT RAG 25,747塊</div>
+<div>canon_panel 上線</div>
+<div>SOP四閘工序</div>
+<div>Daily handoff 常態化</div>
+</div>
+</div>
+</div>
+
+<!-- Evolution arrow / narrative -->
+<div style="margin-top:12px;position:relative;">
+
+<!-- SVG arrow backbone -->
+<svg viewBox="0 0 920 50" width="100%" style="display:block;">
+<defs>
+<linearGradient id="evoGrad" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#2a78d6"/>
+<stop offset="25%" stop-color="#eb6834"/>
+<stop offset="50%" stop-color="#1baf7a"/>
+<stop offset="75%" stop-color="#d4537e"/>
+<stop offset="100%" stop-color="#4a3aa7"/>
+</linearGradient>
+<marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#4a3aa7"/>
+</marker>
+</defs>
+<line x1="20" y1="25" x2="890" y2="25" stroke="url(#evoGrad)" stroke-width="3" marker-end="url(#ah)"/>
+<circle cx="92" cy="25" r="5" fill="#2a78d6"/>
+<circle cx="276" cy="25" r="7" fill="#eb6834" stroke="#fff" stroke-width="2"/>
+<circle cx="460" cy="25" r="5" fill="#1baf7a"/>
+<circle cx="644" cy="25" r="7" fill="#d4537e" stroke="#fff" stroke-width="2"/>
+<circle cx="828" cy="25" r="5" fill="#4a3aa7"/>
+<text x="92" y="45" text-anchor="middle" fill="#185FA5" font-size="10">奠基</text>
+<text x="276" y="45" text-anchor="middle" fill="#993C1D" font-size="10" font-weight="500">相變 I</text>
+<text x="460" y="45" text-anchor="middle" fill="#0F6E56" font-size="10">統一</text>
+<text x="644" y="45" text-anchor="middle" fill="#993556" font-size="10" font-weight="500">相變 II</text>
+<text x="828" y="45" text-anchor="middle" fill="#534AB7" font-size="10">收斂</text>
+</svg>
+</div>
+
+<!-- Bottom narrative -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;font-size:12px;">
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:8px 10px;">
+<div style="font-weight:500;color:var(--text-primary);margin-bottom:2px;">相變 I（四月）</div>
+<div style="color:var(--text-secondary);line-height:1.5;">從「每個 skill 獨立運作」到「糾纏網絡 + 強制雙跑」。階層樹思維死亡，物理糾纏取代設計選擇。</div>
+</div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:8px 10px;">
+<div style="font-weight:500;color:var(--text-primary);margin-bottom:2px;">相變 II（六月）</div>
+<div style="color:var(--text-secondary);line-height:1.5;">從「對外批判單軸」到「Λ↔Λ̄ 雙軸」。系統獲得自我觀測能力——省悟層不是工具，是反粒子。</div>
+</div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:8px 10px;">
+<div style="font-weight:500;color:var(--text-primary);margin-bottom:2px;">收斂態（七月）</div>
+<div style="color:var(--text-secondary);line-height:1.5;">框架停止擴張，轉向實戰驗證。AI-RMA 1210 檔 + GPT RAG 25,747 塊 = 理論落地為基礎設施。</div>
+</div>
+</div>
+
+</div>
+
+  <div class="footer">
+    <div class="quote">「你在用 AI，我在訓練我的 AI。」 · 「凡我標記的，就是我的。」</div>
+    <div>Edward OS · 思維架構進化系統 · 2026.03 – 08</div>
+  </div>
+
+</div>
+</body>
+</html>
