@@ -184,7 +184,7 @@ def main():
     p, meta = build(out_dir, tabs, a.outfile)
     print(f"[儀表板] 產出 {p}")
     for key, label, src, ex in meta:
-        print(f"  分頁 {label:<8} ← {src}  {'✓ 已內嵌' if ex else '✗ 尚未產生'}")
+        print(f"  分頁 {label:<8} <- {src}  {'[OK] 已內嵌' if ex else '[--] 尚未產生'}")
     print(f"[儀表板] 內嵌式，file:// 本機與 GitHub Pages 皆可開")
     return 0
 

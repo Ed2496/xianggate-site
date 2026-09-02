@@ -29,3 +29,4 @@ if errorlevel 1 (echo 推送失敗，檢查 git remote -v & pause & exit /b 1)
 echo.
 echo 完成！首頁 index.html 現在是分頁儀表板(週報+概念)。
 start "" "%SITE%\index.html"
+pause

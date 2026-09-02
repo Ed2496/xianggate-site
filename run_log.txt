@@ -43,3 +43,23 @@ Traceback (most recent call last):
     print(f"  ���� {label:<8} �� {src}  {'\u2713 �w���O' if ex else '\u2717 �|������'}")
 UnicodeEncodeError: 'cp950' codec can't encode character '\u2713' in position 29: illegal multibyte sequence
 [週三 2026/09/02 21:49:49.19] [WARN] 儀表板合併失敗，weekly.html 已更新但 index.html 未刷新 
+warning: in the working copy of 'README_部署.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'csv_concept_engine.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'run_log.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sample_preview.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'xianggate_weekly.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'csv_concept_engine_old.py', LF will be replaced by CRLF the next time Git touches it
+[main fda43f7] 相閘週報 週三 2026/09/02
+ 14 files changed, 595 insertions(+), 662 deletions(-)
+ create mode 100644 csv_concept_engine_old.py
+ delete mode 100644 git_push_now.bat
+ create mode 100644 reports/2026-W36.html
+To https://github.com/Ed2496/xianggate-site.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/Ed2496/xianggate-site.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+[週三 2026/09/02 21:49:49.35] [ERROR] git push 失敗（檢查認證/網路） 
