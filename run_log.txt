@@ -63,3 +63,18 @@ hint: the same ref. If you want to integrate the remote changes, use
 hint: 'git pull' before pushing again.
 hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 [é€±ä¸‰ 2026/09/02 21:49:49.35] [ERROR] git push å¤±æ•—ï¼ˆæª¢æŸ¥èªè­‰/ç¶²è·¯ï¼‰ 
+============================================== 
+[é€±äº” 2026/09/04  9:00:03.38] é–‹å§‹åŸ·è¡Œç›¸é–˜é€±å ± 
+[¬Û¹h¶g³ø] 2026-W36  as-of 2026-09-04T09:00:04  v1.6 (²Ö¥[§é½u+no-cache)
+  ¶×¤J¤é´Á°ò·Ç: modified¡]­×§ï¤é´Á¡^
+  ¤½¶}¦w¥ş¼Ò¦¡: ON(³vÀÉ©ú²ÓÁôÂÃ)
+  ±½´y¥Ø¿ı  : ['C:\\Users\\ed249\\Downloads\\TXT2026', 'C:\\Users\\ed249\\Downloads\\Transcripts-20260120']
+  ¯À§÷Á`¼Æ  : 2895¡]¥»¶g·s¼W 11¡^
+  ¦r¤¸Á`¶q  : 92,999,062¡]¥»¶g +29,223¡^
+  ¾ú¥v¶g¼Æ  : 40
+  ­º­¶      : C:\Users\ed249\Downloads\xianggate-site\weekly.html
+  «Ê¦s      : C:\Users\ed249\Downloads\xianggate-site\reports\2026-W36.html
+[»öªíªO] ²£¥X C:\Users\ed249\Downloads\xianggate-site\index.html
+  ¤À­¶ ¯À§÷¶g³ø     <- weekly.html  [OK] ¤w¤º´O
+  ¤À­¶ ·§©À¯Á¤Ş¤ÀªR   <- concept_analysis.html  [OK] ¤w¤º´O
+[»öªíªO] ¤º´O¦¡¡Afile:// ¥»¾÷»P GitHub Pages ¬Ò¥i¶}
