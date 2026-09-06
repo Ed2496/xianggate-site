@@ -1,0 +1,12 @@
+[
+  {
+    "ts": "2026-09-07T00:30:59",
+    "data_date": "20260906",
+    "source": "記事20260906.csv + keep_notes_review.csv",
+    "notes": 3352,
+    "framed": 2232,
+    "coverage": 67,
+    "ringed": 336,
+    "orphans": 1078
+  }
+]

@@ -19,13 +19,13 @@ r"""
 
 紀律：資料殘缺標殘缺(僅前100字摘要)；不對齊外部數字；零第三方依賴。
 """
-import os,re,csv,io,ast,glob,html,collections
+import os,re,csv,io,ast,glob,html,collections,json
 from datetime import datetime
 
 CSV_DIR=r"C:\Users\ed249\OneDrive\Documents"
 OUT_DIR=r"C:\Users\ed249\Downloads\xianggate-site"
 WEEKLY_PY="xianggate_weekly.py"
-VERSION="concept-v2.1"
+VERSION="concept-v2.2"
 
 # 第二來源：Simplenote 匯出（你從 Windows 記事換到 Simplenote，2026-08-29 加）
 KEEP_CSV="keep_notes_review.csv"
@@ -211,10 +211,73 @@ def svg_axis_stream(ax_month,height=300):
             parts.append(f'<text x="{x:.1f}" y="{yb}" text-anchor="middle" font-size="7" fill="{PAL["mute"]}" transform="rotate(90 {x:.1f} {yb})">{mm}</text>')
     return f'<svg viewBox="0 0 {W} {H}" width="100%" style="min-height:{H}px" role="img">{"".join(parts)}</svg>'
 
+def update_concept_history(out_dir, snap, keep=30):
+    """歷次產出紀錄（append-only · 不遺忘）：以資料日去重（同資料日重跑覆寫），
+    依產出時間排序，最多留 keep 筆。回傳全部歷史（時間升序）。"""
+    hp = os.path.join(out_dir, "concept_history.json")
+    hist = []
+    if os.path.isfile(hp):
+        try: hist = json.load(open(hp, encoding="utf-8"))
+        except Exception: hist = []
+    hist = [h for h in hist if h.get("data_date") != snap["data_date"]]
+    hist.append(snap)
+    hist.sort(key=lambda h: h.get("ts",""))
+    hist = hist[-keep:]
+    try:
+        json.dump(hist, open(hp,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+    except Exception: pass
+    return hist
+
+def concept_history_html(hist):
+    """歷次比對表：新→舊，每列對前一次(時間較早)算 Δ；便箋掉>10% 整列標紅。"""
+    if not hist or len(hist) < 1: return ""
+    rows = list(reversed(hist))  # hist 為時間升序 → 顯示新在上
+    def dlt(cur, older, key):
+        if not older: return ""
+        d = cur - older.get(key, cur)
+        if d == 0: return ' <span style="color:#9AAAA2;font-size:11px">±0</span>'
+        col = "#0E8A6D" if d > 0 else "#C2393E"
+        sign = "▲" if d > 0 else "▼"
+        return f' <span style="color:{col};font-size:11px">{sign}{abs(d):,}</span>'
+    trs = []
+    for i, h in enumerate(rows):
+        older = rows[i+1] if i+1 < len(rows) else None
+        notes = h.get("notes", 0)
+        drop = bool(older) and notes < older.get("notes", notes) * 0.9
+        bd = "border-left:3px solid #C2393E" if drop else "border-left:3px solid transparent"
+        nd = dlt(notes, older, "notes"); od = dlt(h.get("orphans",0), older, "orphans")
+        trs.append(
+            f'<tr style="{bd}">'
+            f'<td>{html.escape(str(h.get("ts",""))[:16].replace("T"," "))}</td>'
+            f'<td>{html.escape(str(h.get("data_date","")))}</td>'
+            f'<td class="num">{notes:,}{nd}</td>'
+            f'<td class="num">{h.get("framed",0):,}</td>'
+            f'<td class="num">{h.get("coverage",0)}%</td>'
+            f'<td class="num">{h.get("ringed",0):,}</td>'
+            f'<td class="num">{h.get("orphans",0):,}{od}</td>'
+            f'<td style="font-size:11px;color:#6B7C74">{html.escape(str(h.get("source","")))}</td>'
+            f'</tr>'
+        )
+    return (
+        '<h2>D0 · 歷次產出紀錄（抓異常）</h2>'
+        '<table><thead><tr><th>產出時間</th><th>資料日</th>'
+        '<th class="num">結論便箋</th><th class="num">歸入框架</th><th class="num">覆蓋</th>'
+        '<th class="num">相閘環</th><th class="num">真孤兒</th><th>來源</th></tr></thead>'
+        f'<tbody>{"".join(trs)}</tbody></table>'
+        '<div class="note">每列對<b>前一次產出</b>算 Δ（▲增 ▼減）；結論便箋較前次掉逾 10% 者<b>整列左緣標紅</b>——'
+        '一眼看出資料異常（如來源檔驟減、CSV 換版）。同一資料日重跑會覆寫該列，不重複堆疊。</div>'
+    )
+
 def render(notes,rings,meta,out_dir):
     ax_cnt,ring_cnt,ax_ring,orphans,ax_month=analyze(notes,rings)
     total=len(notes);gen=datetime.now().isoformat(timespec="seconds")
     ax_cov=sum(ax_cnt.values());ring_cov=sum(ring_cnt.values())
+    # 歷次產出紀錄（不遺忘）：記本次快照、讀回全部歷史、產出比對表
+    _snap={"ts":gen,"data_date":meta.get("date",""),"source":meta.get("file",""),
+           "notes":total,"framed":ax_cov,"coverage":round(ax_cov/total*100) if total else 0,
+           "ringed":ring_cov,"orphans":len(orphans)}
+    _hist=update_concept_history(out_dir,_snap)
+    hist_html=concept_history_html(_hist)
     empty_rings=[r for r in rings if ring_cnt[r]==0] if rings else []
     ring_rows="".join(f'<tr><td>{html.escape(r)}</td><td class="num">{ring_cnt[r]}</td><td>{"⚠ 空環" if ring_cnt[r]==0 else ""}</td></tr>' for r in rings) if rings else '<tr><td colspan=3>未載入相閘環</td></tr>'
     orphan_sample="".join(f'<li>{html.escape(o[:60])}</li>' for o in orphans[:20])
@@ -240,6 +303,7 @@ def render(notes,rings,meta,out_dir):
  <div class="stat"><b>{ring_cov}</b><span>落入相閘環</span></div>
  <div class="stat"><b>{len(orphans)}</b><span>真孤兒</span></div>
 </div>
+{hist_html}
 <div class="note">便箋性質：每則是一個<b>已收斂的結論/小主題總結</b>（產出後記入防忘），本質即第五境 Λ 沉澱。
 本報告把每條結論歸位到相閘環(窄靶)與框架軸(寬靶)，回答「心得沉澱在哪、哪裡空」。僅前100字摘要，不對齊外部數字。</div>
 
