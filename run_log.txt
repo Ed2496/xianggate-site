@@ -78,3 +78,14 @@ hint: See the 'Note about fast-forwards' in 'git push --help' for details.
   ¤À­¶ ¯À§÷¶g³ø     <- weekly.html  [OK] ¤w¤º´O
   ¤À­¶ ·§©À¯Á¤Ş¤ÀªR   <- concept_analysis.html  [OK] ¤w¤º´O
 [»öªíªO] ¤º´O¦¡¡Afile:// ¥»¾÷»P GitHub Pages ¬Ò¥i¶}
+[main 1003da1] ç›¸é–˜é€±å ± é€±äº” 2026/09/04
+ 5 files changed, 210 insertions(+), 188 deletions(-)
+To https://github.com/Ed2496/xianggate-site.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/Ed2496/xianggate-site.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+[é€±äº” 2026/09/04  9:00:26.55] [ERROR] git push å¤±æ•—ï¼ˆæª¢æŸ¥èªè­‰/ç¶²è·¯ï¼‰ 
