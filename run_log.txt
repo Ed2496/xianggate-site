@@ -89,3 +89,22 @@ hint: the same ref. If you want to integrate the remote changes, use
 hint: 'git pull' before pushing again.
 hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 [é€±äº” 2026/09/04  9:00:26.55] [ERROR] git push å¤±æ•—ï¼ˆæª¢æŸ¥èªè­‰/ç¶²è·¯ï¼‰ 
+============================================== 
+[é€±äº” 2026/09/11  9:00:02.87] é–‹å§‹åŸ·è¡Œç›¸é–˜é€±å ± 
+[²Ä¤­¹Ò £N] 2026-W37  ©w½Z 0 ¡U §_¨M 0 ¡U ­Ô¿ï 11
+  TXT: C:\Users\ed249\Downloads\xianggate-site\lambda\lambda_2026-W37.txt
+  DB : C:\Users\ed249\Downloads\xianggate-site\xianggate.db
+[¬Û¹h¶g³ø] 2026-W37  as-of 2026-09-11T09:00:03
+  ¶×¤J¤é´Á°ò·Ç: modified¡]­×§ï¤é´Á¡^
+  ¤½¶}¦w¥ş¼Ò¦¡: ON(³vÀÉ©ú²ÓÁôÂÃ)
+  ±½´y¥Ø¿ı  : ['C:\\Users\\ed249\\Downloads\\TXT2026', 'C:\\Users\\ed249\\Downloads\\Transcripts-20260120']
+  ¯À§÷Á`¼Æ  : 3014¡]¥»¶g·s¼W 96¡^
+  ¦r¤¸Á`¶q  : 93,515,425¡]¥»¶g +249,116¡^
+  ¾ú¥v¶g¼Æ  : 41
+  ­º­¶      : C:\Users\ed249\Downloads\xianggate-site\weekly.html
+  «Ê¦s      : C:\Users\ed249\Downloads\xianggate-site\reports\2026-W37.html
+  ¼Ğ°O¼h    : mark_chain +63 µ§ ¡÷ C:\Users\ed249\Downloads\xianggate-site\xianggate.db
+[»öªíªO] ²£¥X C:\Users\ed249\Downloads\xianggate-site\index.html
+  ¤À­¶ ¯À§÷¶g³ø     <- weekly.html  [OK] ¤w¤º´O
+  ¤À­¶ ·§©À¯Á¤Ş¤ÀªR   <- concept_analysis.html  [OK] ¤w¤º´O
+[»öªíªO] ¤º´O¦¡¡Afile:// ¥»¾÷»P GitHub Pages ¬Ò¥i¶}
