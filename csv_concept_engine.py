@@ -31,7 +31,7 @@ VERSION="concept-v2.2"
 KEEP_CSV="keep_notes_review.csv"
 
 # 通用欄位偵測候選（Simplenote/Keep/其他 CSV 欄名不定，自動抓；抓錯用 SOURCE_OVERRIDES 釘死）
-TEXT_COL_CANDIDATES=["ConversationTopic","Content","content","Text","text","Note","note",
+TEXT_COL_CANDIDATES=["記事本文","ConversationTopic","Content","content","Text","text","Note","note",
     "Body","body","Note Content","NoteContent","內容","筆記","本文","memo","Memo"]
 DATE_COL_CANDIDATES=["MessageDeliveryTime","Created Date","CreatedDate","Created","created",
     "Modified Date","ModifiedDate","Modified","modified","Updated","updated","Edited",
@@ -102,7 +102,7 @@ def _pick_col(hdr, candidates, override=None):
 def load_notes_any(path):
     """通用載入器：表頭自動偵測 text/date 欄（Simplenote/Keep 等欄名不定）。
     抓不到 text 欄 → 用內容平均最長的欄兜底。回傳 (notes, (text欄名, date欄名))。"""
-    raw=open(path,'rb').read().decode('utf-8','replace')
+    raw=open(path,'rb').read().decode('utf-8-sig','replace')  # utf-8-sig：剝掉 BOM，否則第一欄名帶 \ufeff 導致欄名比對失敗、退回兜底
     rows=list(csv.reader(io.StringIO(raw)))
     if not rows: return [], ("空檔","無")
     hdr=rows[0]; base=os.path.basename(path)
@@ -128,6 +128,19 @@ def load_notes_any(path):
     det=(hdr[ti] if ti is not None and ti<len(hdr) else f"idx{ti}",
          hdr[dti] if (dti is not None and dti<len(hdr)) else "無")
     return out, det
+
+def dedup_notes(notes):
+    """完全相同去重（去所有空白後比對）：同一則保留首次出現，保序。
+    若首次出現者無日期(ym)、後出現者有，補上日期以保全 D4 時間演化
+    （記事無日期欄→ym=None，keep 有→用 keep 的日期）。"""
+    seen={};order=[]
+    for n in notes:
+        k=re.sub(r'\s+','',n["txt"])
+        if k not in seen:
+            seen[k]=n;order.append(k)
+        elif seen[k].get("ym") is None and n.get("ym"):
+            seen[k]["ym"]=n["ym"]
+    return [seen[k] for k in order]
 
 def score(t,table):
     return {k:sum(1 for w in kws if w in t) for k,kws in table.items()}
@@ -215,6 +228,7 @@ def update_concept_history(out_dir, snap, keep=30):
     """歷次產出紀錄（append-only · 不遺忘）：以資料日去重（同資料日重跑覆寫），
     依產出時間排序，最多留 keep 筆。回傳全部歷史（時間升序）。"""
     hp = os.path.join(out_dir, "concept_history.json")
+    os.makedirs(out_dir, exist_ok=True)  # 修：原本在 _write 才建目錄，導致寫進全新資料夾時 json 被靜默跳過
     hist = []
     if os.path.isfile(hp):
         try: hist = json.load(open(hp, encoding="utf-8"))
@@ -354,9 +368,9 @@ def main():
         # 來源一：最新 記事*.csv（舊 Windows 記事，可能已無）
         path,date=find_latest_csv(scan_dir)
         if path:
-            n=load_notes(path)
+            n,det=load_notes_any(path)
             notes+=n;srcs.append(os.path.basename(path));dates.append(date)
-            print(f"[歸位引擎] 讀 {path} (資料日 {date}) ｜ 便箋 {len(n)} 筆 ｜ 來源：記事")
+            print(f"[歸位引擎] 讀 {path} (資料日 {date}) ｜ 便箋 {len(n)} 筆 ｜ 來源：記事 ｜ 欄位偵測 text={det[0]} date={det[1]}")
         # 來源二：keep_notes_review.csv（Simplenote 匯出）
         keep=os.path.join(scan_dir,KEEP_CSV)
         if os.path.isfile(keep):
@@ -368,6 +382,8 @@ def main():
             print(f"✗ 找不到 記事*.csv 或 {KEEP_CSV} 於 {scan_dir}");return 1
 
     print(f"[歸位引擎] 合併便箋 {len(notes)} 筆（來源 {len(srcs)} 個：{', '.join(srcs)}）")
+    _pre=len(notes);notes=dedup_notes(notes);_dup=_pre-len(notes)
+    print(f"[歸位引擎] 完全相同去重：移除 {_dup} 則重複 → 真實不重複 {len(notes)} 筆")
     meta={"file":" + ".join(srcs) if srcs else "?","date":max(dates) if dates else "?"}
     outp=render(notes,rings,meta,out_dir)
     print(f"[歸位引擎] 報告 → {outp}");return 0
