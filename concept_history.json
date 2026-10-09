@@ -118,5 +118,15 @@
     "coverage": 70,
     "ringed": 529,
     "orphans": 1182
+  },
+  {
+    "ts": "2026-10-09T10:28:17",
+    "data_date": "20261009",
+    "source": "記事20261009.csv + keep_notes_review.csv",
+    "notes": 4149,
+    "framed": 2912,
+    "coverage": 70,
+    "ringed": 533,
+    "orphans": 1189
   }
 ]
