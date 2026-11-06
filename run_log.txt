@@ -279,3 +279,22 @@ To https://github.com/Ed2496/xianggate-site.git
    e96ce36..fec1372  main -> main
 [é€±äº” 2026/10/30  9:00:44.35] å·² push åˆ° GitHub Pages 
 [é€±äº” 2026/10/30  9:00:48.85] å®Œæˆ 
+============================================== 
+[é€±äº” 2026/11/06  9:00:04.19] é–‹å§‹åŸ·è¡Œç›¸é–˜é€±å ± 
+[²Ä¤­¹Ò £N] 2026-W45  ©w½Z 0 ¡U §_¨M 0 ¡U ­Ô¿ï 11
+  TXT: C:\Users\ed249\Downloads\xianggate-site\lambda\lambda_2026-W45.txt
+  DB : C:\Users\ed249\Downloads\xianggate-site\xianggate.db
+[¬Û¹h¶g³ø] 2026-W45  as-of 2026-11-06T09:00:05
+  ¶×¤J¤é´Á°ò·Ç: modified¡]­×§ï¤é´Á¡^
+  ¤½¶}¦w¥ş¼Ò¦¡: ON(³vÀÉ©ú²ÓÁôÂÃ)
+  ±½´y¥Ø¿ı  : ['C:\\Users\\ed249\\Downloads\\TXT2026', 'C:\\Users\\ed249\\Downloads\\Transcripts-20260120']
+  ¯À§÷Á`¼Æ  : 3780¡]¥»¶g·s¼W 13¡^
+  ¦r¤¸Á`¶q  : 95,578,852¡]¥»¶g +56,938¡^
+  ¾ú¥v¶g¼Æ  : 49
+  ­º­¶      : C:\Users\ed249\Downloads\xianggate-site\weekly.html
+  «Ê¦s      : C:\Users\ed249\Downloads\xianggate-site\reports\2026-W45.html
+  ¼Ğ°O¼h    : mark_chain +7 µ§ ¡÷ C:\Users\ed249\Downloads\xianggate-site\xianggate.db
+[»öªíªO] ²£¥X C:\Users\ed249\Downloads\xianggate-site\index.html
+  ¤À­¶ ¯À§÷¶g³ø     <- weekly.html  [OK] ¤w¤º´O
+  ¤À­¶ ·§©À¯Á¤Ş¤ÀªR   <- concept_analysis.html  [OK] ¤w¤º´O
+[»öªíªO] ¤º´O¦¡¡Afile:// ¥»¾÷»P GitHub Pages ¬Ò¥i¶}
